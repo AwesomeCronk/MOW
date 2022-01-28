@@ -1,11 +1,18 @@
-import argparse
-from tempfile import TemporaryFile
+import os
 
 import hikari
 
 
-with open('token.txt', 'r') as tokenFile:
-    bot = hikari.GatewayBot(token=tokenFile.read())
+# This lets me use Replit's secrets system and database and still run test builds locally
+if not os.environ.has_key('TOKEN'):
+    with open('token.txt', 'r') as environFile:
+        os.environ['TOKEN'] = environFile.read()
+if not os.environ.has_key('REPLIT_DB_URL'):
+    with open('replit_db_url.txt', 'r') as environFile:
+        os.environ['REPLIT_DB_URL'] = environFile.read()
+
+bot = hikari.GatewayBot(token=os.environ['token'])
+
 
 ## Commands ##
 async def command_test(event):
