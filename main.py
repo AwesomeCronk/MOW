@@ -1,7 +1,6 @@
 import os, argparse, contextlib, io, shlex, sys, traceback
 
 import hikari
-from replit import db
 
 
 # This lets me use Replit's secrets system and database and still run test builds locally
@@ -12,8 +11,12 @@ if not 'REPLIT_DB_URL' in os.environ:
     with open('replit_db_url.txt', 'r') as environFile:
         os.environ['REPLIT_DB_URL'] = environFile.read()
 
-bot = hikari.GatewayBot(token=os.environ['TOKEN'])
+from replit import db
 
+bot = hikari.GatewayBot(token=os.environ['TOKEN'])
+backend = 'Replit' if 'REPL_OWNER' in os.environ else 'Local test'
+
+## Helpers ##
 @contextlib.contextmanager
 def redirectIO():
     stdoutOld = sys.stdout
@@ -40,10 +43,18 @@ def userHasPermission(user, guild, permission):
 
 
 ## Commands ##
-async def command_test(event):
+async def command_test(event, *rawArgs):
     channel= event.get_channel()
     sender = event.author
     await channel.send('test command fired')
+
+async def command_info(event):
+    channel = event.get_channel()
+    info = [
+        'Status: Online',
+        'Backend: {}'.format(backend)
+    ]
+    await channel.send('\n'.join(info))
 
 async def command_help(event):
     channel = event.get_channel()
@@ -53,9 +64,7 @@ async def command_rules(event, *rawArgs):
     sender = event.author
     channel = event.get_channel()
 
-    print('checking args')
     try:
-        argsFailed = False
         with redirectIO() as (argparseOut, argparseErr):
             parser = argparse.ArgumentParser(prog='rules')
             group = parser.add_mutually_exclusive_group()
@@ -63,54 +72,77 @@ async def command_rules(event, *rawArgs):
                 '-a',
                 '--add',
                 help='Add a rule to the list',
-                nargs=2
+                nargs=1,
+                type=str
             )
             group.add_argument(
                 '-r',
                 '--remove',
                 help='Remove a rule from the list',
-                nargs=1
+                nargs=1,
+                type=int
             )
             parser.add_argument(
                 '-c',
                 '--channel',
                 help='Channel for which to get/set rules (defaults to global)',
                 nargs=1,
-                default='global'
+                type=str,
+                default=['<everywhere>']
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        argsFailed = True
-
-    if argsFailed:
         await channel.send(argparseOut.getvalue() + argparseErr.getvalue())
+        return
+        
+    # Command stuff goes here
+    targetChannel = args.channel[0]
+    try:
+        rules = db.get('rules{}'.format(targetChannel))
+    except:
+        rules = []
+    if rules is None:
+        rules = []
+
+    if args.add:
+        if userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
+            rules.append(args.add[0])
+            await channel.send('Added rule for {}.'.format(targetChannel))
+        else:
+            await channel.send('You need permission: MANAGE_GUILD to add rules')
+    elif args.remove:
+        if userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
+            del(rules[args.remove[0] - 1])
+            await channel.send('Removed rule for {}.'.format(targetChannel))
+        else:
+            await channel.send('You need permission: MANAGE_GUILD to remove rules')
     else:
-        # Command stuff goes here
-        if args.add:
-            if userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
-                await channel.send('Added rule.')
-            else:
-                await channel.send('You need permission: MANAGE_SERVER to add rules')
+        await channel.send('Here are the rules for {}:\n{}'.format(targetChannel, '\n'.join(['{}. {}'.format(i + 1, rules[i]) for i in range(len(rules))])))
+
+    db.set('rules{}'.format(targetChannel), rules)
 
 
 commands = {
     'test': (command_test, 'Test command to make sure MOW is online'),
+    'info': (command_info, 'Show bot info'),
     'help': (command_help, 'Show help for all commands'),
     'rules': (command_rules, 'Set/show rules')
 }
 
 @bot.listen(hikari.GuildMessageCreateEvent)
-async def printMessages(event):
+async def handleMessages(event):
     text = event.content
-    try:
-        commandData = shlex.split(text)
-    except Exception as e:
-        await event.get_channel().send(str(e))
-    prefix = commandData[0]
+    prefix = text[0:4]
 
-    if prefix == 'mow':
+    if prefix == 'mow ':
         try:
-            command, *args = commandData[1:]
+            commandData = shlex.split(text[4:])
+        except Exception as e:
+            await event.get_channel().send(str(e))
+            return
+        
+        try:
+            command, *args = commandData
         except ValueError:
             await event.get_channel().send('must enter a command')
             return
@@ -120,6 +152,7 @@ async def printMessages(event):
         except KeyError:
             await event.get_channel().send('invalid command: "{}"'.format(command))
             return
+        
         try:
             await function(event, *args)
         except Exception as e:
