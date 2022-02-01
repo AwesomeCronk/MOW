@@ -12,9 +12,12 @@ if not 'REPLIT_DB_URL' in os.environ:
         os.environ['REPLIT_DB_URL'] = environFile.read()
 
 from replit import db
+from keepAlive import startKeepAlive
 
 bot = hikari.GatewayBot(token=os.environ['TOKEN'])
 backend = 'Replit' if 'REPL_OWNER' in os.environ else 'Local test'
+if backend == 'Replit':
+    startKeepAlive()
 
 ## Helpers ##
 @contextlib.contextmanager
