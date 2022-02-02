@@ -119,6 +119,12 @@ async def command_warn(event, *rawArgs):
                 help='List a user\'s warnings',
                 action='store_true'
             )
+            parser.add_argument(
+                '-d',
+                '--direct-messages',
+                help='Send the warning list to your DMs',
+                action='store_true'
+            )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
         await channel.send(argparseOut.getvalue() + argparseErr.getvalue())
@@ -138,7 +144,7 @@ async def command_warn(event, *rawArgs):
 
     if args.list:
         if userMentionedSelf(sender, args.user) or hasPermission:
-            response = 'Warnings for {}:\n{}'.format(targetUser, '\n'.join(['{}. {} {}'.format(i + 1, warnings[i][0], warnings[i][1] if warnings[i][1] != 'None' else '') for i in range(len(warnings))]))
+            response = 'Warnings for {}:\n{}'.format(targetUser, '\n'.join(['{}. {} - {}'.format(i + 1, warnings[i][0], warnings[i][1] if warnings[i][1] != 'None' else '') for i in range(len(warnings))]))
             if args.direct_messages:
                 await sender.send(response)
                 await channel.send('Warning list sent to your DMs.')
@@ -154,7 +160,7 @@ async def command_warn(event, *rawArgs):
 
             ### Need to send record to #modlogs
         else:
-            await channel.send('You do not have permission repeal someone else\'s warnings.')
+            await channel.send('You do not have permission repeal warnings.')
 
     else:
         if hasPermission:
@@ -163,7 +169,7 @@ async def command_warn(event, *rawArgs):
 
             ### Need to send record to #modlogs
         else:
-            await channel.send('You do not have permission warn someone else.')
+            await channel.send('You do not have permission to issue warnings.')
 
     db.set('warnings{}'.format(targetUser), warnings)
 

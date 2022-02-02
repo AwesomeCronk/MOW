@@ -30,7 +30,7 @@ async def handleMessages(event):
         try:
             commandData = shlex.split(text)
         except Exception as e:
-            await event.get_channel().send(str(e))
+            await event.get_channel().send('```python\n{}\n```'.format(traceback.format_exc()))
             return
         
         try:
@@ -48,7 +48,7 @@ async def handleMessages(event):
         try:
             await function(event, *args)
         except Exception as e:
-            await event.get_channel().send('```\n{}\n```'.format(traceback.format_exc()))
+            await event.get_channel().send('```python\n{}\n```'.format(traceback.format_exc()))
             return
 
 bot.run()

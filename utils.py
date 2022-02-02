@@ -24,7 +24,7 @@ def userHasPermission(user, guild, permission):
     for roleID in memberRoles:
         role = guild.get_role(roleID)
         rolePermissions = role.permissions
-        if permission & rolePermissions or permission & hikari.permissions.Permissions.ADMINISTRATOR:
+        if permission & rolePermissions or rolePermissions & hikari.permissions.Permissions.ADMINISTRATOR:
             return True     # Return True if a role with the desired permission is found among the user's roles in this guild
     return False
 
