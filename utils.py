@@ -1,4 +1,6 @@
-import sys, contextlib, io, os
+import sys, contextlib, io, os, re
+
+import hikari
 
 backend = 'Replit' if 'REPL_OWNER' in os.environ else 'Local test'
 
@@ -22,6 +24,10 @@ def userHasPermission(user, guild, permission):
     for roleID in memberRoles:
         role = guild.get_role(roleID)
         rolePermissions = role.permissions
-        if permission & rolePermissions:
+        if permission & rolePermissions or permission & hikari.permissions.Permissions.ADMINISTRATOR:
             return True     # Return True if a role with the desired permission is found among the user's roles in this guild
     return False
+
+def userMentionedSelf(sender, mention):
+    if re.match("""^<@!?(\d+)>$""", str(mention)):
+        return re.findall('\d+', sender.mention) == re.findall('\d+', mention)

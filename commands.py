@@ -1,9 +1,10 @@
-import argparse
+import argparse, re
+from datetime import datetime
 
 import hikari
 
 from replit import db
-from utils import backend, userHasPermission, redirectIO
+from utils import backend, userHasPermission, redirectIO, userMentionedSelf
 
 
 async def command_test(event, *rawArgs):
@@ -84,25 +85,39 @@ async def command_rules(event, *rawArgs):
 
     db.set('rules{}'.format(targetChannel), rules)
 
-async def command_warn(event, rawArgs):
+async def command_warn(event, *rawArgs):
     sender = event.author
     channel = event.get_channel()
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
             parser = argparse.ArgumentParser(prog='rules')
+            group = parser.add_mutually_exclusive_group()
             parser.add_argument(
                 'user',
                 help='User to warn',
                 type=str
             )
-            parser.add_argument(
+            group.add_argument(
                 '-n',
                 '--note',
-                help='Note to record for this warning',
+                help='Record a note for a warning',
                 nargs=1,
                 type=str,
                 default=['None']
+            )
+            group.add_argument(
+                '-r',
+                '--repeal',
+                help='Repeal the last warning for a user',
+                nargs=1,
+                type=int
+            )
+            group.add_argument(
+                '-l',
+                '--list',
+                help='List a user\'s warnings',
+                action='store_true'
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
@@ -110,7 +125,47 @@ async def command_warn(event, rawArgs):
         return
         
     # Command stuff goes here
+    targetUser = args.user
 
+    try:
+        warnings = db.get('warnings{}'.format(targetUser))
+    except:
+        warnings = []
+    if warnings is None:
+        warnings = []
+
+    hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
+
+    if args.list:
+        if userMentionedSelf(sender, args.user) or hasPermission:
+            response = 'Warnings for {}:\n{}'.format(targetUser, '\n'.join(['{}. {} {}'.format(i + 1, warnings[i][0], warnings[i][1] if warnings[i][1] != 'None' else '') for i in range(len(warnings))]))
+            if args.direct_messages:
+                await sender.send(response)
+                await channel.send('Warning list sent to your DMs.')
+            else:
+                await channel.send(response)
+        else:
+            await channel.send('You do not have permission view someone else\'s warnings.')
+
+    elif args.repeal:
+        if hasPermission:
+            del(warnings[args.repeal[0] - 1])
+            await channel.send('Repealed warning {} for {}'.format(args.repeal[0], targetUser))
+
+            ### Need to send record to #modlogs
+        else:
+            await channel.send('You do not have permission repeal someone else\'s warnings.')
+
+    else:
+        if hasPermission:
+            warnings.append((datetime.today().strftime('%Y-%m-%d'), args.note[0]))
+            await channel.send('Warned {}{}'.format(args.user, ' (' + args.note[0] + ')' if args.note[0] != 'None' else ''))
+
+            ### Need to send record to #modlogs
+        else:
+            await channel.send('You do not have permission warn someone else.')
+
+    db.set('warnings{}'.format(targetUser), warnings)
 
 commands = {
     'test': (command_test, 'Test command to make sure MOW is online'),

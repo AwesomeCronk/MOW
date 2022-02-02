@@ -23,12 +23,12 @@ if backend == 'Replit':
 
 @bot.listen(hikari.GuildMessageCreateEvent)
 async def handleMessages(event):
-    text = event.content
-    prefix = text[0:4]
+    text = event.content.strip()[4:]
+    prefix = event.content.strip()[0:4]
 
     if prefix == 'mow ':
         try:
-            commandData = shlex.split(text[4:])
+            commandData = shlex.split(text)
         except Exception as e:
             await event.get_channel().send(str(e))
             return
