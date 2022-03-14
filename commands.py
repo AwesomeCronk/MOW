@@ -1,10 +1,12 @@
 import argparse, re
+from lib2to3.pytree import Base
 from datetime import datetime
 
 import hikari
 
-from replit import db
-from utils import backend, userHasPermission, redirectIO, userMentionedSelf
+from utils import host
+from utils import dbBotData, dbRules, dbWarnings
+from utils import userHasPermission, redirectIO, userMentionedSelf, modLog
 
 
 async def command_test(event, *rawArgs):
@@ -16,7 +18,8 @@ async def command_info(event):
     channel = event.get_channel()
     info = [
         'Status: Online',
-        'Backend: {}'.format(backend)
+        'Host: {}@{}'.format(host[0], host[1]),
+        'Source code: <https://github.com/AwesomeCronk/MOW>'
     ]
     await channel.send('\n'.join(info))
 
@@ -56,34 +59,45 @@ async def command_rules(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send(argparseOut.getvalue() + argparseErr.getvalue())
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return
         
     # Command stuff goes here
     targetChannel = args.channel[0]
-    try:
-        rules = db.get('rules{}'.format(targetChannel))
-    except:
-        rules = []
-    if rules is None:
-        rules = []
 
+    rules = []
+    if targetChannel in dbRules.nodeNames:
+        dbRulesChannel = dbRules.node(targetChannel)
+        for key in dbRulesChannel.keys:
+            rules.append(dbRulesChannel.get(key).decode())
+    
     if args.add:
         if userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
             rules.append(args.add[0])
+            dbRulesChannel.mkKey(len(dbRulesChannel.keys))
             await channel.send('Added rule for {}.'.format(targetChannel))
         else:
             await channel.send('You need permission: MANAGE_GUILD to add rules')
     elif args.remove:
         if userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
             del(rules[args.remove[0] - 1])
+            dbRulesChannel.rmKey(len(dbRulesChannel.keys) - 1)
             await channel.send('Removed rule for {}.'.format(targetChannel))
         else:
             await channel.send('You need permission: MANAGE_GUILD to remove rules')
     else:
-        await channel.send('Here are the rules for {}:\n{}'.format(targetChannel, '\n'.join(['{}. {}'.format(i + 1, rules[i]) for i in range(len(rules))])))
+        if targetChannel == '<everwhere>':
+            response = 'Server rules:\n'
+        else:
+            response = 'Channel {} rules:\n'.format(targetChannel)
+        if len(rules):
+            response += '\n'.join(['{}. {}'.format(i + 1, rules[i]) for i in range(len(rules))])
+        else:
+            response += 'No rules listed.'
+        await channel.send(response)
 
-    db.set('rules{}'.format(targetChannel), rules)
+    for i, rule in enumerate(rules):
+        dbRulesChannel.set(i, rule.encode())
 
 async def command_warn(event, *rawArgs):
     sender = event.author
@@ -91,7 +105,7 @@ async def command_warn(event, *rawArgs):
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='rules')
+            parser = argparse.ArgumentParser(prog='warn')
             group = parser.add_mutually_exclusive_group()
             parser.add_argument(
                 'user',
@@ -113,12 +127,6 @@ async def command_warn(event, *rawArgs):
                 nargs=1,
                 type=int
             )
-            group.add_argument(
-                '-l',
-                '--list',
-                help='List a user\'s warnings',
-                action='store_true'
-            )
             parser.add_argument(
                 '-d',
                 '--direct-messages',
@@ -127,35 +135,25 @@ async def command_warn(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send(argparseOut.getvalue() + argparseErr.getvalue())
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return
         
     # Command stuff goes here
     targetUser = args.user
+    print(targetUser)
 
-    try:
-        warnings = db.get('warnings{}'.format(targetUser))
-    except:
-        warnings = []
-    if warnings is None:
-        warnings = []
+    warnings = []
+    if targetUser in dbWarnings.nodeNames:
+        dbWarningsUser = dbWarnings.node(targetUser)
+        for key in dbWarningsUser.keys:
+            warnings.append(dbWarningsUser.get(key).decode())
 
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
 
-    if args.list:
-        if userMentionedSelf(sender, args.user) or hasPermission:
-            response = 'Warnings for {}:\n{}'.format(targetUser, '\n'.join(['{}. {} - {}'.format(i + 1, warnings[i][0], warnings[i][1] if warnings[i][1] != 'None' else '') for i in range(len(warnings))]))
-            if args.direct_messages:
-                await sender.send(response)
-                await channel.send('Warning list sent to your DMs.')
-            else:
-                await channel.send(response)
-        else:
-            await channel.send('You do not have permission view someone else\'s warnings.')
-
-    elif args.repeal:
+    if args.repeal:
         if hasPermission:
             del(warnings[args.repeal[0] - 1])
+            dbWarningsUser.rmKey(len(dbWarningsUser.keys) - 1)
             await channel.send('Repealed warning {} for {}'.format(args.repeal[0], targetUser))
 
             ### Need to send record to #modlogs
@@ -165,18 +163,112 @@ async def command_warn(event, *rawArgs):
     else:
         if hasPermission:
             warnings.append((datetime.today().strftime('%Y-%m-%d'), args.note[0]))
+            dbWarningsUser.mkKey(len(dbWarningsUser.keys))
             await channel.send('Warned {}{}'.format(args.user, ' (' + args.note[0] + ')' if args.note[0] != 'None' else ''))
 
             ### Need to send record to #modlogs
         else:
             await channel.send('You do not have permission to issue warnings.')
 
-    db.set('warnings{}'.format(targetUser), warnings)
+    for i, warning in enumerate(warnings):
+        dbWarningsUser.set(i, warning.encode())
+
+async def command_warnings(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='warnings')
+            parser.add_argument(
+                'user',
+                help='User for whom to view warnings',
+                type=str
+            )
+            parser.add_argument(
+                '-d',
+                '--direct-messages',
+                help='Send the warning list to your DMs',
+                action='store_true'
+            )
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        return
+        
+    # Command stuff goes here
+    targetUser = args.user
+    print(targetUser)
+
+    warnings = []
+    if targetUser in dbWarnings.nodeNames:
+        dbWarningsUser = dbWarnings.node(targetUser)
+        for key in dbWarningsUser.keys:
+            warnings.append(dbWarningsUser.get(key).decode())
+
+    hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
+
+    if userMentionedSelf(sender, args.user) or hasPermission:
+        response = 'Warnings for {}:\n'.format(targetUser)
+        if len(warnings):
+            response += '\n'.join(['{}. {} - {}'.format(i + 1, warnings[i][0], warnings[i][1] if warnings[i][1] != 'None' else '') for i in range(len(warnings))])
+        else:
+            response += 'No warnings listed.'
+
+        if args.direct_messages:
+            await sender.send(response)
+            await channel.send('Warning list sent to your DMs.')
+        else:
+            await channel.send(response)
+    else:
+        await channel.send('You do not have permission view someone else\'s warnings.')
+
+async def command_config(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='config')
+            parser.add_argument(
+                'key',
+                help='Key to view or modify',
+                type=str
+            )
+            parser.add_argument(
+                '-s',
+                '--set',
+                help='Set the value of the key',
+                nargs=1,
+                action='store'
+            )
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        return
+
+    if args.key == 'token':
+        response = 'Yeah nice try...'
+
+    elif userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
+        oldValue = dbBotData.get(args.key)
+        response = 'Value of `{}` is `{}`'.format(args.key, oldValue.decode())
+        if args.set:
+            dbBotData.set(args.key, args.set[0].encode())
+            newValue = dbBotData.get(args.key)
+            response += '\nValue of `{}` changed to `{}`'.format(args.key, newValue.decode())
+
+    else:
+        response = 'You do not have permission to view or modify MOW configuration.'
+
+    await channel.send(response)
 
 commands = {
     'test': (command_test, 'Test command to make sure MOW is online'),
     'info': (command_info, 'Show bot info'),
     'help': (command_help, 'Show help for all commands'),
-    'rules': (command_rules, 'Set/show rules'),
-    'warn': (command_warn, 'Warn a user')
+    'rules': (command_rules, 'Show or set rules'),
+    'warn': (command_warn, 'Warn a user'),
+    'warnings': (command_warnings, 'View a user\'s warnings'),
+    'config': (command_config, 'View or change configuration')
 }

@@ -1,8 +1,16 @@
+from socket import gethostname
 import sys, contextlib, io, os, re
+from socket import gethostname
 
+import filesystem_database as fs_db
 import hikari
 
-backend = 'Replit' if 'REPL_OWNER' in os.environ else 'Local test'
+host = (os.getlogin(), gethostname())
+
+dbRoot = fs_db.dbNode('./database')
+dbRules = dbRoot.node('rules')
+dbWarnings = dbRoot.node('warnings')
+dbBotData = dbRoot.node('botData')
 
 @contextlib.contextmanager
 def redirectIO():
@@ -15,8 +23,8 @@ def redirectIO():
     try:
         yield stdoutNew, stderrNew
     finally:
-        stdoutOld = sys.stdout
-        stderrOld = sys.stderr
+        sys.stdout = stdoutOld
+        sys.stderr = stderrOld
 
 def userHasPermission(user, guild, permission):
     member = guild.get_member(user)
@@ -24,6 +32,7 @@ def userHasPermission(user, guild, permission):
     for roleID in memberRoles:
         role = guild.get_role(roleID)
         rolePermissions = role.permissions
+        # `return True` is in an if statement so that it doesn't return the first False
         if permission & rolePermissions or rolePermissions & hikari.permissions.Permissions.ADMINISTRATOR:
             return True     # Return True if a role with the desired permission is found among the user's roles in this guild
     return False
@@ -31,3 +40,7 @@ def userHasPermission(user, guild, permission):
 def userMentionedSelf(sender, mention):
     if re.match("""^<@!?(\d+)>$""", str(mention)):
         return re.findall('\d+', sender.mention) == re.findall('\d+', mention)
+
+async def modLog(guild, message):
+    modLogsChannel = guild.get_channel(dbBotData.get('modLogsChannel'))
+    await modLogsChannel.send(message)
