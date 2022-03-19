@@ -9,7 +9,7 @@ runFlag = True
 from uptime import StartUptimeTracking
 
 
-bot = hikari.GatewayBot(token=dbBotData.get('token'))
+bot = hikari.GatewayBot(token=dbBotData.get('token').decode())
 
 # @bot.listen(hikari.events.lifetime_events.StartedEvent)
 # async def startup(event):
