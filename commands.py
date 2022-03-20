@@ -1,8 +1,5 @@
-import argparse, re
-from lib2to3.pytree import Base
+import argparse, hikari, psutil
 from datetime import datetime
-
-import hikari
 
 from utils import host
 from utils import dbBotData, dbRules, dbWarnings
@@ -19,6 +16,8 @@ async def command_info(event):
     info = [
         'Status: Online',
         'Host: {}@{}'.format(host[0], host[1]),
+        'Battery: {}'.format('No battery' if psutil.sensors_battery() is None else psutil.sensors_battery().percent),
+        'CPU Temperature: {} ({})'.format(psutil.sensors_temperatures()['coretemp'][0].current, ', '.join([str(t.current) for t in psutil.sensors_temperatures()['coretemp'][1:]])),
         'Source code: <https://github.com/AwesomeCronk/MOW>'
     ]
     await channel.send('\n'.join(info))
