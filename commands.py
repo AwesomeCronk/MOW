@@ -5,7 +5,7 @@ from utils import host
 from utils import dbBotData, dbRules, dbWarnings
 from utils import userHasPermission, redirectIO, userMentionedSelf, modLog
 
-
+# Bot control/data commands
 async def command_test(event, *rawArgs):
     channel= event.get_channel()
     sender = event.author
@@ -13,10 +13,11 @@ async def command_test(event, *rawArgs):
 
 async def command_info(event):
     channel = event.get_channel()
+    batt = psutil.sensors_battery()
     info = [
         'Status: Online',
         'Host: {}@{}'.format(host[0], host[1]),
-        'Battery: {}'.format('No battery' if psutil.sensors_battery() is None else psutil.sensors_battery().percent),
+        'Battery: {}% {}'.format('No battery' if batt is None else round(batt.percent, 2), '(plugged in)' if batt.power_plugged else '(on battery)'),
         'CPU Temperature: {} ({})'.format(psutil.sensors_temperatures()['coretemp'][0].current, ', '.join([str(t.current) for t in psutil.sensors_temperatures()['coretemp'][1:]])),
         'Source code: <https://github.com/AwesomeCronk/MOW>'
     ]
@@ -26,6 +27,7 @@ async def command_help(event):
     channel = event.get_channel()
     await channel.send('\n'.join(['`{}`: {}'.format(key, commands[key][1]) for key in commands.keys()]) + '\nFor help on a specific command, run that command with the argument `-h` or `--help`.')
 
+# Moderation commands
 async def command_rules(event, *rawArgs):
     sender = event.author
     channel = event.get_channel()
@@ -62,41 +64,49 @@ async def command_rules(event, *rawArgs):
         return
         
     # Command stuff goes here
+    response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
     targetChannel = args.channel[0]
-
     rules = []
-    if targetChannel in dbRules.nodeNames:
-        dbRulesChannel = dbRules.node(targetChannel)
-        for key in dbRulesChannel.keys:
-            rules.append(dbRulesChannel.get(key).decode())
+
+    if not targetChannel in dbRules.nodeNames:
+        # Fetch the first available node ID
+        for id in range(len(dbRules.nodes) + 1):
+            if not id in dbRules.nodes:
+                break
+        # Create a node with it
+        dbRules.mkNode(id, targetChannel)
+    
+    dbRulesChannel = dbRules.node(targetChannel)
+    for key in dbRulesChannel.keys:
+        rules.append(dbRulesChannel.get(key).decode())
     
     if args.add:
         if userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
             rules.append(args.add[0])
             dbRulesChannel.mkKey(len(dbRulesChannel.keys))
-            await channel.send('Added rule for {}.'.format(targetChannel))
+            response += 'Added rule for {}.'.format('server' if targetChannel == '<everywhere>' else targetChannel)
         else:
-            await channel.send('You need permission: MANAGE_GUILD to add rules')
+            response += 'You need permission: MANAGE_GUILD to add rules'
     elif args.remove:
         if userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
             del(rules[args.remove[0] - 1])
             dbRulesChannel.rmKey(len(dbRulesChannel.keys) - 1)
-            await channel.send('Removed rule for {}.'.format(targetChannel))
+            response += 'Removed rule for {}.'.format(targetChannel)
         else:
-            await channel.send('You need permission: MANAGE_GUILD to remove rules')
+            response += 'You need permission: MANAGE_GUILD to remove rules'
     else:
-        if targetChannel == '<everwhere>':
-            response = 'Server rules:\n'
+        if targetChannel == '<everywhere>':
+            response += 'Server rules:\n'
         else:
-            response = 'Channel {} rules:\n'.format(targetChannel)
+            response += 'Rules for channel {}:\n'.format(targetChannel)
         if len(rules):
             response += '\n'.join(['{}. {}'.format(i + 1, rules[i]) for i in range(len(rules))])
         else:
             response += 'No rules listed.'
-        await channel.send(response)
-
+    
     for i, rule in enumerate(rules):
         dbRulesChannel.set(i, rule.encode())
+    await channel.send(response)
 
 async def command_warn(event, *rawArgs):
     sender = event.author
@@ -138,6 +148,7 @@ async def command_warn(event, *rawArgs):
         return
         
     # Command stuff goes here
+    response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
     targetUser = args.user
     print(targetUser)
 
@@ -153,24 +164,25 @@ async def command_warn(event, *rawArgs):
         if hasPermission:
             del(warnings[args.repeal[0] - 1])
             dbWarningsUser.rmKey(len(dbWarningsUser.keys) - 1)
-            await channel.send('Repealed warning {} for {}'.format(args.repeal[0], targetUser))
+            response += 'Repealed warning {} for {}'.format(args.repeal[0], targetUser)
 
             ### Need to send record to #modlogs
         else:
-            await channel.send('You do not have permission repeal warnings.')
+            response += 'You do not have permission repeal warnings.'
 
     else:
         if hasPermission:
             warnings.append((datetime.today().strftime('%Y-%m-%d'), args.note[0]))
             dbWarningsUser.mkKey(len(dbWarningsUser.keys))
-            await channel.send('Warned {}{}'.format(args.user, ' (' + args.note[0] + ')' if args.note[0] != 'None' else ''))
+            response += 'Warned {}{}'.format(args.user, ' (' + args.note[0] + ')' if args.note[0] != 'None' else '')
 
             ### Need to send record to #modlogs
         else:
-            await channel.send('You do not have permission to issue warnings.')
+            response += 'You do not have permission to issue warnings.'
 
     for i, warning in enumerate(warnings):
         dbWarningsUser.set(i, warning.encode())
+    await channel.send(response)
 
 async def command_warnings(event, *rawArgs):
     sender = event.author
@@ -196,8 +208,9 @@ async def command_warnings(event, *rawArgs):
         return
         
     # Command stuff goes here
+    response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
     targetUser = args.user
-    print(targetUser)
+    # print(targetUser)
 
     warnings = []
     if targetUser in dbWarnings.nodeNames:
@@ -220,7 +233,8 @@ async def command_warnings(event, *rawArgs):
         else:
             await channel.send(response)
     else:
-        await channel.send('You do not have permission view someone else\'s warnings.')
+        response += 'You do not have permission view someone else\'s warnings.'
+        await channel.send(response)
 
 async def command_config(event, *rawArgs):
     sender = event.author
@@ -266,6 +280,7 @@ commands = {
     'test': (command_test, 'Test command to make sure MOW is online'),
     'info': (command_info, 'Show bot info'),
     'help': (command_help, 'Show help for all commands'),
+
     'rules': (command_rules, 'Show or set rules'),
     'warn': (command_warn, 'Warn a user'),
     'warnings': (command_warnings, 'View a user\'s warnings'),

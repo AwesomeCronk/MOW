@@ -40,12 +40,13 @@ bot = hikari.GatewayBot(token=dbBotData.get('token').decode())
 @bot.listen(hikari.GuildMessageCreateEvent)
 async def handleMessages(event):
     commandPrefix = dbBotData.get('prefix').decode()
-    text = event.content.strip()[len(commandPrefix):]
     prefix = event.content.strip()[0:len(commandPrefix)]
 
     # print(repr(commandPrefix), repr(prefix))
 
     if prefix == commandPrefix:
+        text = event.content.strip()[len(commandPrefix):]
+        print('Running command "{}"'.format(text))
         # print(repr(text))
         try:
             commandData = shlex.split(text)
