@@ -39,6 +39,9 @@ bot = hikari.GatewayBot(token=dbBotData.get('token').decode())
 
 @bot.listen(hikari.GuildMessageCreateEvent)
 async def handleMessages(event):
+    if event.content is None:
+        return
+
     commandPrefix = dbBotData.get('prefix').decode()
     prefix = event.content.strip()[0:len(commandPrefix)]
 
