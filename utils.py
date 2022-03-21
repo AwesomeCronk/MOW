@@ -44,3 +44,13 @@ def userMentionedSelf(sender, mention):
 async def modLog(guild, message):
     modLogsChannel = guild.get_channel(dbBotData.get('modLogsChannel'))
     await modLogsChannel.send(message)
+
+async def updatePrefixStatus():
+    from __main__ import bot
+    await bot.update_presence(
+        status=hikari.Status.ONLINE,
+        activity=hikari.Activity(
+            name='for "{}"'.format(dbBotData.get('prefix').decode()),
+            type=hikari.ActivityType.WATCHING
+        )
+    )

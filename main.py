@@ -2,40 +2,18 @@ import shlex, traceback
 
 import hikari
 
-from utils import dbBotData
+from utils import dbBotData, updatePrefixStatus
 from commands import commands
 
 runFlag = True
 from uptime import StartUptimeTracking
 
-# Set presense
-# bot = hikari.GatewayBot(token)
-# 
-# # When the presence is static
-# bot.run(
-#     status=hikari.Status.DO_NOT_DISTURB,
-#     activity=hikari.Activity(
-#         name="you learn hikari!",
-#         type=hikari.ActivityType.WATCHING,
-#     ),
-# )
-# 
-# # OR
-# # When you need to update while the bot is running
-# await bot.update_presence(
-#     status=hikari.Status.DO_NOT_DISTURB,
-#     activity=hikari.Activity(
-#         name="you learn hikari!",
-#         type=hikari.ActivityType.WATCHING,
-#     ),
-# )
 
 bot = hikari.GatewayBot(token=dbBotData.get('token').decode())
 
-# @bot.listen(hikari.events.lifetime_events.StartedEvent)
-# async def startup(event):
-#     print('startup')
-#     # await bot.update_presence(status='online and working')
+@bot.listen(hikari.events.lifetime_events.StartedEvent)
+async def startup(event):
+    await updatePrefixStatus()
 
 @bot.listen(hikari.GuildMessageCreateEvent)
 async def handleMessages(event):
@@ -49,7 +27,7 @@ async def handleMessages(event):
 
     if prefix == commandPrefix:
         text = event.content.strip()[len(commandPrefix):]
-        print('Running command "{}"'.format(text))
+        print('Command "{}"'.format(text))
         # print(repr(text))
         try:
             commandData = shlex.split(text)

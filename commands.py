@@ -3,7 +3,7 @@ from datetime import datetime
 
 from utils import host
 from utils import dbBotData, dbRules, dbWarnings
-from utils import userHasPermission, redirectIO, userMentionedSelf, modLog
+from utils import userHasPermission, redirectIO, userMentionedSelf, updatePrefixStatus
 
 # Bot control/data commands
 async def command_test(event, *rawArgs):
@@ -272,7 +272,10 @@ async def command_config(event, *rawArgs):
             response += '\nValue of `{}` changed to `{}`'.format(args.key, newValue.decode())
 
     else:
-        response = 'You do not have permission to view or modify MOW configuration.'
+        response = 'You do not have permission to view or modify Maintenance of Way configuration.'
+
+    if args.key == 'prefix':
+        await updatePrefixStatus()
 
     await channel.send(response)
 
