@@ -42,7 +42,7 @@ def userMentionedSelf(sender, mention):
         return re.findall('\d+', sender.mention) == re.findall('\d+', mention)
 
 async def modLog(guild, message):
-    modLogsChannel = guild.get_channel(dbBotData.get('modLogsChannel'))
+    modLogsChannel = guild.get_channel(int(dbBotData.get('modLogsChannel').decode()))
     await modLogsChannel.send(message)
 
 async def updatePrefixStatus():

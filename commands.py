@@ -3,7 +3,7 @@ from datetime import datetime
 
 from utils import host
 from utils import dbBotData, dbRules, dbWarnings
-from utils import userHasPermission, redirectIO, userMentionedSelf, updatePrefixStatus
+from utils import userHasPermission, redirectIO, userMentionedSelf, modLog, updatePrefixStatus
 
 # Bot control/data commands
 async def command_test(event, *rawArgs):
@@ -111,6 +111,8 @@ async def command_rules(event, *rawArgs):
 async def command_warn(event, *rawArgs):
     sender = event.author
     channel = event.get_channel()
+    guild = event.get_guild()
+    print(sender.mention)
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
@@ -153,35 +155,53 @@ async def command_warn(event, *rawArgs):
     print(targetUser)
 
     warnings = []
-    if targetUser in dbWarnings.nodeNames:
-        dbWarningsUser = dbWarnings.node(targetUser)
-        for key in dbWarningsUser.keys:
-            warnings.append(dbWarningsUser.get(key).decode())
+
+    if not targetUser in dbWarnings.nodeNames:
+        # Fetch the first available node ID
+        for id in range(len(dbWarnings.nodes) + 1):
+            if not id in dbWarnings.nodes:
+                break
+        # Create a node with it
+        dbWarnings.mkNode(id, targetUser)
+
+    dbWarningsUser = dbWarnings.node(targetUser)
+    for node in dbWarningsUser.nodes:
+        dbWarning = dbWarningsUser.node(node)
+        warnings.append((dbWarning.get('timestamp').decode(), dbWarning.get('note').decode()))
 
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
 
     if args.repeal:
+        note = dbWarningsUser.node(args.repeal[0] - 1).get('note').decode()
         if hasPermission:
-            del(warnings[args.repeal[0] - 1])
-            dbWarningsUser.rmKey(len(dbWarningsUser.keys) - 1)
+            del(warnings[args.repeal[0] - 1])   # Remove that item from the list
+            dbWarningsUser.rmNode(len(dbWarningsUser.nodes) - 1)  # Remove the last key (warnings will be rewritten in the proper order)
             response += 'Repealed warning {} for {}'.format(args.repeal[0], targetUser)
 
-            ### Need to send record to #modlogs
+            await modLog(guild, '{} repealed warning {} for {}. (Note: {})'.format(sender, args.repeal[0], targetUser, note))
         else:
             response += 'You do not have permission repeal warnings.'
+            await modLog(guild, '{} tried to repeal warning {} for {}. (Note: {})'.format(sender, args.repeal[0], targetUser, note))
 
     else:
         if hasPermission:
             warnings.append((datetime.today().strftime('%Y-%m-%d'), args.note[0]))
-            dbWarningsUser.mkKey(len(dbWarningsUser.keys))
-            response += 'Warned {}{}'.format(args.user, ' (' + args.note[0] + ')' if args.note[0] != 'None' else '')
+            dbWarningsUser.mkNode(len(dbWarningsUser.nodes))
+            dbWarning = dbWarningsUser.node(len(dbWarningsUser.nodes) - 1)
+            dbWarning.mkKey(0, 'timestamp')
+            dbWarning.mkKey(1, 'note')
+            response += 'Warned {}{}'.format(targetUser, ' (' + args.note[0] + ')' if args.note[0] != 'None' else '')
 
-            ### Need to send record to #modlogs
+            await modLog(guild, '{} warned {}. (Note: {})'.format(sender, targetUser, args.note[0]))
         else:
             response += 'You do not have permission to issue warnings.'
+            await modLog(guild, '{} tried to warn {}. (Note: {})'.format(sender, targetUser, args.note[0]))
 
     for i, warning in enumerate(warnings):
-        dbWarningsUser.set(i, warning.encode())
+        timestamp, note = warning
+        dbWarning = dbWarningsUser.node(i)
+        dbWarning.set('timestamp', timestamp.encode())
+        dbWarning.set('note', note.encode())
     await channel.send(response)
 
 async def command_warnings(event, *rawArgs):
@@ -215,8 +235,9 @@ async def command_warnings(event, *rawArgs):
     warnings = []
     if targetUser in dbWarnings.nodeNames:
         dbWarningsUser = dbWarnings.node(targetUser)
-        for key in dbWarningsUser.keys:
-            warnings.append(dbWarningsUser.get(key).decode())
+        for node in dbWarningsUser.nodes:
+            dbWarning = dbWarningsUser.node(node)
+            warnings.append((dbWarning.get('timestamp').decode(), dbWarning.get('note').decode()))
 
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
 
@@ -255,17 +276,32 @@ async def command_config(event, *rawArgs):
                 nargs=1,
                 action='store'
             )
+            parser.add_argument(
+                '-c',
+                '--create',
+                help='Create a new key',
+                action='store_true'
+            )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
         await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return
 
     if args.key == 'token':
-        response = 'Yeah nice try...'
+        response = 'Value of `token` is `Cronk\'s token. Property of Cronk. Do not use except for Cronk.`'
 
     elif userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
+        if args.create:
+            # Get the first available key ID
+            for id in range(len(dbBotData.keys) + 1):
+                if not id in dbBotData.keys:
+                    break
+            # Create a key with it
+            dbBotData.mkKey(id, args.key)
+
         oldValue = dbBotData.get(args.key)
-        response = 'Value of `{}` is `{}`'.format(args.key, oldValue.decode())
+        response = 'Value of `{}` is `{}`'.format(args.key, oldValue.decode() if oldValue else ' ')
+
         if args.set:
             dbBotData.set(args.key, args.set[0].encode())
             newValue = dbBotData.get(args.key)
@@ -280,7 +316,7 @@ async def command_config(event, *rawArgs):
     await channel.send(response)
 
 commands = {
-    'test': (command_test, 'Test command to make sure MOW is online'),
+    'test': (command_test, 'Test command to check if Maintenance of Way is online'),
     'info': (command_info, 'Show bot info'),
     'help': (command_help, 'Show help for all commands'),
 
