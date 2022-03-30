@@ -3,7 +3,7 @@ from datetime import datetime
 
 from utils import host, publishInfraction
 from utils import dbBotData, dbRules, dbWarnings
-from utils import userHasPermission, redirectIO, userMentionedSelf, modLog, updatePrefixStatus
+from utils import userHasPermission, redirectIO, userMentionedSelf, modLog, updatePrefixStatus, getIDFromMention
 
 # Bot control/data commands
 async def command_test(event, *rawArgs):
@@ -153,6 +153,10 @@ async def command_warn(event, *rawArgs):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
     warnings = []
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
+
+    # Get target user object
+    id = getIDFromMention(args.user)
+    member = guild.get_member(id)
     
     # Ensure this user has a database entry, even if they have no warnings (empty entry)
     # It's a lot simpler than checking every third stage of the command
@@ -177,6 +181,8 @@ async def command_warn(event, *rawArgs):
             dbWarningsUser.rmNode(len(dbWarningsUser.nodes) - 1)  # Remove the last key (warnings will be rewritten in the proper order)
             response += 'Repealed warning {} for {}'.format(args.repeal[0], args.user)
             await modLog(guild, '{}: {} repealed warning {} for {}. (Note: {})'.format(timestamp, sender.mention, args.repeal[0], args.user, note))
+            warningRoleID = int(dbBotData.get('warningRole{}'.format(len(warnings) + 1)))
+            await member.remove_role(warningRoleID)
 
         else:
             response += 'You do not have permission repeal warnings.'
@@ -203,6 +209,11 @@ async def command_warn(event, *rawArgs):
         dbWarning = dbWarningsUser.node(i)
         dbWarning.set('timestamp', timestamp.encode())
         dbWarning.set('note', note.encode())
+
+    # Set the warning roles
+    if len(warnings) > 0:
+        warningRoleID = int(dbBotData.get('warningRole{}'.format(len(warnings))))
+        await member.add_role(warningRoleID)
     await channel.send(response)
 
 async def command_warnings(event, *rawArgs):
@@ -307,7 +318,7 @@ async def command_config(event, *rawArgs):
                     break
             # Create a key with it
             dbBotData.mkKey(id, args.key)
-            response += 'Created {}\n'.format(args.key)
+            response += 'Created `{}`\n'.format(args.key)
 
 
         oldValue = dbBotData.get(args.key)
