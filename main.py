@@ -30,7 +30,7 @@ async def handleMessages(event):
         print('Command "{}"'.format(text))
         # print(repr(text))
         try:
-            commandData = shlex.split(text)
+            commandData = shlex.split(text.replace('“', '"').replace('”', '"')) # Replaces iOS quotes with normal quotes before splitting
             # print('split')
         except Exception as e:
             await event.get_channel().send('```python\n{}\n```'.format(traceback.format_exc()))
