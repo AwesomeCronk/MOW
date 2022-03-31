@@ -154,9 +154,17 @@ async def command_warn(event, *rawArgs):
     warnings = []
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
 
-    # Get target user object
-    id = getIDFromMention(args.user)
-    member = guild.get_member(id)
+    if hasPermission:
+        # Get target user object
+        id = getIDFromMention(args.user)
+        member = guild.get_member(id)
+        if member is None:
+            print('Failed to get member from guild, trying bot cache...')
+            from __main__ import bot
+            member = bot.cache.get_member(guild.id, id)
+        if member is None:
+            print('Failed to get member from guild or bot cache.')
+            await channel.send('*Failed to get member from guild or bot cache. Any role operations will need done manually*')
     
     # Ensure this user has a database entry, even if they have no warnings (empty entry)
     # It's a lot simpler than checking every third stage of the command
@@ -182,7 +190,8 @@ async def command_warn(event, *rawArgs):
             response += 'Repealed warning {} for {}'.format(args.repeal[0], args.user)
             await modLog(guild, '{}: {} repealed warning {} for {}. (Note: {})'.format(timestamp, sender.mention, args.repeal[0], args.user, note))
             warningRoleID = int(dbBotData.get('warningRole{}'.format(len(warnings) + 1)))
-            await member.remove_role(warningRoleID)
+            if not member is None:
+                await member.remove_role(warningRoleID)
 
         else:
             response += 'You do not have permission repeal warnings.'
@@ -197,7 +206,7 @@ async def command_warn(event, *rawArgs):
             dbWarning.mkKey(1, 'note')
             response += 'Warned {}{}'.format(args.user, ' (' + args.note[0] + ')' if args.note[0] != 'None' else '')
             await modLog(guild, '{}: {} warned {}. (Note: {})'.format(timestamp, sender.mention, args.user, args.note[0]))
-            await publishInfraction(guild, '{}: {} warned {}. (Note: {})'.format(timestamp, sender.mention, args.user, args.note[0]))
+            await publishInfraction(guild, '{}: {} warned {}. (Note: {})\nTotal: {} warnings'.format(timestamp, sender.mention, args.user, args.note[0], len(warnings)))
 
         else:
             response += 'You do not have permission to issue warnings.'
@@ -211,9 +220,24 @@ async def command_warn(event, *rawArgs):
         dbWarning.set('note', note.encode())
 
     # Set the warning roles
-    if len(warnings) > 0:
+    if 0 < len(warnings) <= 3:
         warningRoleID = int(dbBotData.get('warningRole{}'.format(len(warnings))))
-        await member.add_role(warningRoleID)
+        if member is None:
+            response += '\n*Cannot automatically modify roles due to a cache error, please do so manually.*'
+        else:
+            await member.add_role(warningRoleID)
+
+    # Auto-kick / auto-ban
+    if member is None:
+        response += '\n*Cannot auto-kick or auto-ban due to a cache error, please kick or ban manually.*'
+    else:
+        if dbBotData.get('autoKickEnabled') == b'yes' and len(warnings) == 3:
+            await member.kick()
+            response += '\n{} was kicked automatically.'.format(args.user)
+        if dbBotData.get('autoBanEnabled') == b'yes' and len(warnings) == 4:
+            await member.ban()
+            response += '\n{} was banned automatically.'.format(args.user)
+
     await channel.send(response)
 
 async def command_warnings(event, *rawArgs):
