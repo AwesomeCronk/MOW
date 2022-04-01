@@ -55,6 +55,7 @@ async def handleMessages(event):
             # print('executed')
         except Exception as e:
             await event.get_channel().send('```python\n{}\n```'.format(traceback.format_exc()))
+            print('Command "{}" failed.'.format(text))
             return
 
 

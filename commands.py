@@ -23,6 +23,81 @@ async def command_info(event):
     ]
     await channel.send('\n'.join(info))
 
+async def command_config(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='config')
+            parser.add_argument(
+                'key',
+                help='Key to view or modify',
+                type=str
+            )
+            parser.add_argument(
+                '-s',
+                '--set',
+                help='Set the value of the key',
+                nargs=1,
+                action='store'
+            )
+            parser.add_argument(
+                '-c',
+                '--create',
+                help='Create the key',
+                action='store_true'
+            )
+            parser.add_argument(
+                '-r',
+                '--remove',
+                help='Remove the key',
+                action='store_true'
+            )
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        return
+
+    if args.key == 'token':
+        response = 'Value of `token` is `Cronk\'s token. Property of Cronk. Do not use except for Cronk.`'
+
+    elif userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
+        response = ''
+
+        if args.create:
+            # Get the first available key ID
+            for id in range(len(dbBotData.keys) + 1):
+                if not id in dbBotData.keys:
+                    break
+            # Create a key with it
+            dbBotData.mkKey(id, args.key)
+            response += 'Created `{}`\n'.format(args.key)
+
+
+        oldValue = dbBotData.get(args.key)
+        response += 'Value of `{}` is `{}`'.format(args.key, oldValue.decode() if oldValue else ' ')
+
+        if args.set:
+            dbBotData.set(args.key, args.set[0].encode())
+            newValue = dbBotData.get(args.key)
+            response += '\nValue of `{}` changed to `{}`'.format(args.key, newValue.decode())
+
+        if args.remove:
+            if args.key == 'prefix':    # Fail-safe to keep the bot from breaking entirely.
+                response += '\nYou cannot remove the prefix.'
+            else:
+                dbBotData.rmKey(args.key)
+                response += '\nRemoved `{}`'.format(args.key)
+
+    else:
+        response = 'You do not have permission to view or modify Maintenance of Way configuration.'
+
+    if args.key == 'prefix':
+        await updatePrefixStatus()
+
+    await channel.send(response)
+
 async def command_help(event):
     channel = event.get_channel()
     await channel.send('\n'.join(['`{}`: {}'.format(key, commands[key][1]) for key in commands.keys()]) + '\nFor help on a specific command, run that command with the argument `-h` or `--help`.')
@@ -137,12 +212,6 @@ async def command_warn(event, *rawArgs):
                 nargs=1,
                 type=int
             )
-            parser.add_argument(
-                '-d',
-                '--direct-messages',
-                help='Send the warning list to your DMs',
-                action='store_true'
-            )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
         await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
@@ -164,7 +233,7 @@ async def command_warn(event, *rawArgs):
             member = bot.cache.get_member(guild.id, id)
         if member is None:
             print('Failed to get member from guild or bot cache.')
-            await channel.send('*Failed to get member from guild or bot cache. Any role operations will need done manually*')
+            await channel.send('*Failed to get member from guild or bot cache. Please perform any role operations manually.*')
     
     # Ensure this user has a database entry, even if they have no warnings (empty entry)
     # It's a lot simpler than checking every third stage of the command
@@ -293,88 +362,120 @@ async def command_warnings(event, *rawArgs):
         response += 'You do not have permission view someone else\'s warnings.'
         await channel.send(response)
 
-async def command_config(event, *rawArgs):
+async def command_kick(event, *rawArgs):
     sender = event.author
     channel = event.get_channel()
+    guild = event.get_guild()
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='config')
+            parser = argparse.ArgumentParser(prog='kick')
+            group = parser.add_mutually_exclusive_group()
             parser.add_argument(
-                'key',
-                help='Key to view or modify',
+                'user',
+                help='User to kick',
                 type=str
-            )
-            parser.add_argument(
-                '-s',
-                '--set',
-                help='Set the value of the key',
-                nargs=1,
-                action='store'
-            )
-            parser.add_argument(
-                '-c',
-                '--create',
-                help='Create the key',
-                action='store_true'
-            )
-            parser.add_argument(
-                '-r',
-                '--remove',
-                help='Remove the key',
-                action='store_true'
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
         await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return
+        
+    # Command stuff goes here
+    response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
 
-    if args.key == 'token':
-        response = 'Value of `token` is `Cronk\'s token. Property of Cronk. Do not use except for Cronk.`'
+    hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
+    
+    if hasPermission:
+        # Get target user object
+        id = getIDFromMention(args.user)
+        member = guild.get_member(id)
+        if member is None:
+            print('Failed to get member from guild, trying bot cache...')
+            from __main__ import bot
+            member = bot.cache.get_member(guild.id, id)
+        if member is None:
+            print('Failed to get member from guild or bot cache.')
+            await channel.send('*Failed to get member from guild or bot cache. Please wait a moment and try again or kick them manually.*')
+        
+        if member is None:
+            response += 'Could not kick {}.'.format(args.user)
+        else:
+            await guild.kick(member.user)
 
-    elif userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
-        response = ''
-
-        if args.create:
-            # Get the first available key ID
-            for id in range(len(dbBotData.keys) + 1):
-                if not id in dbBotData.keys:
-                    break
-            # Create a key with it
-            dbBotData.mkKey(id, args.key)
-            response += 'Created `{}`\n'.format(args.key)
-
-
-        oldValue = dbBotData.get(args.key)
-        response += 'Value of `{}` is `{}`'.format(args.key, oldValue.decode() if oldValue else ' ')
-
-        if args.set:
-            dbBotData.set(args.key, args.set[0].encode())
-            newValue = dbBotData.get(args.key)
-            response += '\nValue of `{}` changed to `{}`'.format(args.key, newValue.decode())
-
-        if args.remove:
-            if args.key == 'prefix':    # Fail-safe to keep the bot from breaking entirely.
-                response += '\nYou cannot remove the prefix.'
-            else:
-                dbBotData.rmKey(args.key)
-                response += '\nRemoved `{}`'.format(args.key)
-
+            response += 'kicked {}'.format(args.user)
+            await modLog(guild, '{}: {} kicked {}.'.format(timestamp, sender.mention, args.user))
+            await publishInfraction(guild, '{}: {} kicked {}.'.format(timestamp, sender.mention, args.user))
+    
     else:
-        response = 'You do not have permission to view or modify Maintenance of Way configuration.'
-
-    if args.key == 'prefix':
-        await updatePrefixStatus()
-
+        response += 'You do not have permission to kick users.'
+        await modLog(guild, '{}: {} tried to kick {}.'.format(timestamp, sender.mention, args.user))
+    
     await channel.send(response)
+
+async def command_ban(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+    guild = event.get_guild()
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='ban')
+            parser.add_argument(
+                'user',
+                help='User to ban',
+                type=str
+            )
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse problem')
+        return
+        
+    # Command stuff goes here
+    response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+    hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
+    
+    if hasPermission:
+        # Get target user object
+        id = getIDFromMention(args.user)
+        member = guild.get_member(id)
+        if member is None:
+            print('Failed to get member from guild, trying bot cache...')
+            from __main__ import bot
+            member = bot.cache.get_member(guild.id, id)
+        if member is None:
+            print('Failed to get member from guild or bot cache.')
+            await channel.send('*Failed to get member from guild or bot cache. Please wait a moment and try again or ban them manually.*')
+        
+        if member is None:
+            response += 'Could not ban {}.'.format(args.user)
+        else:
+            await guild.ban(member.user)
+            
+            response += 'Banned {}'.format(args.user)
+            await modLog(guild, '{}: {} banned {}.'.format(timestamp, sender.mention, args.user))
+            await publishInfraction(guild, '{}: {} banned {}.'.format(timestamp, sender.mention, args.user))
+    
+    else:
+        response += 'You do not have permission to ban users.'
+        await modLog(guild, '{}: {} tried to ban {}.'.format(timestamp, sender.mention, args.user))
+    
+    await channel.send(response)
+
 
 commands = {
     'test': (command_test, 'Test command to check if Maintenance of Way is online'),
     'info': (command_info, 'Show bot info'),
+    'config': (command_config, 'View or change configuration'),
     'help': (command_help, 'Show help for all commands'),
 
     'rules': (command_rules, 'Show or set rules'),
     'warn': (command_warn, 'Warn a user'),
     'warnings': (command_warnings, 'View a user\'s warnings'),
-    'config': (command_config, 'View or change configuration')
+    'kick': (command_kick, 'Kick a user from the server'),
+    'ban': (command_ban, 'Ban a user from the server')
 }
