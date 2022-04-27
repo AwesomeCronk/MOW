@@ -222,31 +222,32 @@ async def command_warn(event, *rawArgs):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
     warnings = []
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
+    userID = getIDFromMention(args.user)
 
     if hasPermission:
         # Get target user object
-        id = getIDFromMention(args.user)
-        member = guild.get_member(id)
+        
+        member = guild.get_member(userID)
         if member is None:
             print('Failed to get member from guild, trying bot cache...')
             from __main__ import bot
-            member = bot.cache.get_member(guild.id, id)
+            member = bot.cache.get_member(guild.id, userID)
         if member is None:
             print('Failed to get member from guild or bot cache.')
             await channel.send('*Failed to get member from guild or bot cache. Please perform any role operations manually.*')
     
     # Ensure this user has a database entry, even if they have no warnings (empty entry)
     # It's a lot simpler than checking every third stage of the command
-    if not args.user in dbWarnings.nodeNames:
+    if not str(userID) in dbWarnings.nodeNames:
         # Fetch the first available node ID
         for id in range(len(dbWarnings.nodes) + 1):
             if not id in dbWarnings.nodes:
                 break
         # Create a node with it
-        dbWarnings.mkNode(id, args.user)
+        dbWarnings.mkNode(id, str(userID))
 
     # Load warnings from database
-    dbWarningsUser = dbWarnings.node(args.user)
+    dbWarningsUser = dbWarnings.node(str(userID))
     for node in dbWarningsUser.nodes:
         dbWarning = dbWarningsUser.node(node)
         warnings.append((dbWarning.get('timestamp').decode(), dbWarning.get('note').decode()))
@@ -334,12 +335,12 @@ async def command_warnings(event, *rawArgs):
         
     # Command stuff goes here
     response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
-    targetUser = args.user
+    userID = getIDFromMention(args.user)
     # print(targetUser)
 
     warnings = []
-    if targetUser in dbWarnings.nodeNames:
-        dbWarningsUser = dbWarnings.node(targetUser)
+    if str(userID) in dbWarnings.nodeNames:
+        dbWarningsUser = dbWarnings.node(str(userID))
         for node in dbWarningsUser.nodes:
             dbWarning = dbWarningsUser.node(node)
             warnings.append((dbWarning.get('timestamp').decode(), dbWarning.get('note').decode()))
@@ -347,7 +348,7 @@ async def command_warnings(event, *rawArgs):
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
 
     if userMentionedSelf(sender, args.user) or hasPermission:
-        response = 'Warnings for {}:\n'.format(targetUser)
+        response = 'Warnings for {}:\n'.format(args.user)
         if len(warnings):
             response += '\n'.join(['{}. {} - {}'.format(i + 1, warnings[i][0], warnings[i][1] if warnings[i][1] != 'None' else '') for i in range(len(warnings))])
         else:
