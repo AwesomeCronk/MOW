@@ -5,14 +5,21 @@ from utils import host, publishInfraction
 from utils import dbBotData, dbRules, dbWarnings
 from utils import userHasPermission, redirectIO, userMentionedSelf, modLog, updatePrefixStatus, getIDFromMention
 
-# Bot control/data commands
-async def command_test(event, *rawArgs):
-    channel= event.get_channel()
-    sender = event.author
-    await channel.send('test command fired')
+commandPrefix = dbBotData.get('prefix').decode()
 
-async def command_info(event):
+# Bot control/data commands
+async def command_info(event, *rawArgs):
     channel = event.get_channel()
+    
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='info', description=commands['info'][1])
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
+        return
+
     batt = psutil.sensors_battery()
     info = [
         'Status: Online',
@@ -29,7 +36,7 @@ async def command_config(event, *rawArgs):
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='config')
+            parser = argparse.ArgumentParser(prog='config', description=commands['config'][1])
             parser.add_argument(
                 'key',
                 help='Key to view or modify',
@@ -57,6 +64,7 @@ async def command_config(event, *rawArgs):
             args = parser.parse_args(rawArgs)
     except BaseException as e:
         await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
         return
 
     if args.key == 'token':
@@ -98,9 +106,19 @@ async def command_config(event, *rawArgs):
 
     await channel.send(response)
 
-async def command_help(event):
+async def command_help(event, *rawArgs):
     channel = event.get_channel()
-    await channel.send('\n'.join(['`{}`: {}'.format(key, commands[key][1]) for key in commands.keys()]) + '\nFor help on a specific command, run that command with the argument `-h` or `--help`.')
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='help', description=commands['help'][1])
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
+        return
+
+    await channel.send('\n'.join(['`{}{}` - {}'.format(commandPrefix, key, commands[key][1]) for key in commands.keys()]) + '\nFor help on a specific command, run that command with the argument `-h` or `--help`.')
 
 # Moderation commands
 async def command_rules(event, *rawArgs):
@@ -109,7 +127,7 @@ async def command_rules(event, *rawArgs):
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='rules')
+            parser = argparse.ArgumentParser(prog='rules', description=commands['rules'][1])
             group = parser.add_mutually_exclusive_group()
             group.add_argument(
                 '-a',
@@ -136,6 +154,7 @@ async def command_rules(event, *rawArgs):
             args = parser.parse_args(rawArgs)
     except BaseException as e:
         await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
         return
         
     # Command stuff goes here
@@ -190,7 +209,7 @@ async def command_warn(event, *rawArgs):
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='warn')
+            parser = argparse.ArgumentParser(prog='warn', description=commands['warn'][1])
             group = parser.add_mutually_exclusive_group()
             parser.add_argument(
                 'user',
@@ -215,6 +234,7 @@ async def command_warn(event, *rawArgs):
             args = parser.parse_args(rawArgs)
     except BaseException as e:
         await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
         return
         
     # Command stuff goes here
@@ -281,31 +301,32 @@ async def command_warn(event, *rawArgs):
             response += 'You do not have permission to issue warnings.'
             await modLog(guild, '{}: {} tried to warn {}. (Note: {})'.format(timestamp, sender.mention, args.user, args.note[0]))
 
-    # Record warnings in the database
-    for i, warning in enumerate(warnings):
-        timestamp, note = warning
-        dbWarning = dbWarningsUser.node(i)
-        dbWarning.set('timestamp', timestamp.encode())
-        dbWarning.set('note', note.encode())
+    if hasPermission:
+        # Record warnings in the database
+        for i, warning in enumerate(warnings):
+            timestamp, note = warning
+            dbWarning = dbWarningsUser.node(i)
+            dbWarning.set('timestamp', timestamp.encode())
+            dbWarning.set('note', note.encode())
 
-    # Set the warning roles
-    if 0 < len(warnings) <= 3:
-        warningRoleID = int(dbBotData.get('warningRole{}'.format(len(warnings))))
+        # Set the warning roles
+        if 0 < len(warnings) <= 3:
+            warningRoleID = int(dbBotData.get('warningRole{}'.format(len(warnings))))
+            if member is None:
+                response += '\n*Cannot automatically modify roles due to a cache error, please do so manually.*'
+            else:
+                await member.add_role(warningRoleID)
+
+        # Auto-kick / auto-ban
         if member is None:
-            response += '\n*Cannot automatically modify roles due to a cache error, please do so manually.*'
+            response += '\n*Cannot auto-kick or auto-ban due to a cache error, please kick or ban manually.*'
         else:
-            await member.add_role(warningRoleID)
-
-    # Auto-kick / auto-ban
-    if member is None:
-        response += '\n*Cannot auto-kick or auto-ban due to a cache error, please kick or ban manually.*'
-    else:
-        if dbBotData.get('autoKickEnabled') == b'yes' and len(warnings) == 3:
-            await member.kick()
-            response += '\n{} was kicked automatically.'.format(args.user)
-        if dbBotData.get('autoBanEnabled') == b'yes' and len(warnings) == 4:
-            await member.ban()
-            response += '\n{} was banned automatically.'.format(args.user)
+            if dbBotData.get('autoKickEnabled') == b'yes' and len(warnings) == 3:
+                await member.kick()
+                response += '\n{} was kicked automatically.'.format(args.user)
+            if dbBotData.get('autoBanEnabled') == b'yes' and len(warnings) == 4:
+                await member.ban()
+                response += '\n{} was banned automatically.'.format(args.user)
 
     await channel.send(response)
 
@@ -315,7 +336,7 @@ async def command_warnings(event, *rawArgs):
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='warnings')
+            parser = argparse.ArgumentParser(prog='warnings', description=commands['warnings'][1])
             parser.add_argument(
                 'user',
                 help='User for whom to view warnings',
@@ -330,6 +351,7 @@ async def command_warnings(event, *rawArgs):
             args = parser.parse_args(rawArgs)
     except BaseException as e:
         await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
         return
         
     # Command stuff goes here
@@ -369,7 +391,7 @@ async def command_kick(event, *rawArgs):
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='kick')
+            parser = argparse.ArgumentParser(prog='kick', description=commands['kick'][1])
             group = parser.add_mutually_exclusive_group()
             parser.add_argument(
                 'user',
@@ -379,6 +401,7 @@ async def command_kick(event, *rawArgs):
             args = parser.parse_args(rawArgs)
     except BaseException as e:
         await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
         return
         
     # Command stuff goes here
@@ -421,7 +444,7 @@ async def command_ban(event, *rawArgs):
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='ban')
+            parser = argparse.ArgumentParser(prog='ban', description=commands['ban'][1])
             parser.add_argument(
                 'user',
                 help='User to ban',
@@ -430,7 +453,7 @@ async def command_ban(event, *rawArgs):
             args = parser.parse_args(rawArgs)
     except BaseException as e:
         await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse problem')
+        print('argparse exited')
         return
         
     # Command stuff goes here
@@ -466,16 +489,14 @@ async def command_ban(event, *rawArgs):
     
     await channel.send(response)
 
-
 commands = {
-    'test': (command_test, 'Test command to check if Maintenance of Way is online'),
-    'info': (command_info, 'Show bot info'),
-    'config': (command_config, 'View or change configuration'),
-    'help': (command_help, 'Show help for all commands'),
+    'info': (command_info, 'Show bot info: `{}info`'.format(commandPrefix)),
+    'config': (command_config, 'View or change configuration (no usage example, only ever used by Cronk)'),
+    'help': (command_help, 'Show help for all commands (please don\'t ask me to explain this one, just don\'t)'),
 
-    'rules': (command_rules, 'Show or set rules'),
-    'warn': (command_warn, 'Warn a user'),
-    'warnings': (command_warnings, 'View a user\'s warnings'),
-    'kick': (command_kick, 'Kick a user from the server'),
-    'ban': (command_ban, 'Ban a user from the server')
+    'rules': (command_rules, 'Show or set rules: `{}rules` (to get server rules) | `{}rules -c #channel` (to get channel rules)'.format(commandPrefix, commandPrefix)),
+    'warn': (command_warn, 'Warn a user or repeal a warning: `{}warn @user -n "note (remember the quotes)"`(warn somebody) | `{}warn @user -r <warning number>` (repeal a warning)'.format(commandPrefix, commandPrefix)),
+    'warnings': (command_warnings, 'View a user\'s warnings: `{}warnings @user`'.format(commandPrefix)),
+    'kick': (command_kick, 'Kick a user from the server: `{}kick @user`'.format(commandPrefix)),
+    'ban': (command_ban, 'Ban a user from the server: `{}ban @user`'.format(commandPrefix))
 }
