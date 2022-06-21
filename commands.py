@@ -1,5 +1,5 @@
 import argparse, hikari, psutil
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from utils import host, publishInfraction
 from utils import dbBotData, dbRules, dbWarnings
@@ -490,6 +490,77 @@ async def command_ban(event, *rawArgs):
     
     await channel.send(response)
 
+async def command_shush(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+    guild = event.get_guild()
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='shush', description=commands['shush'][1])
+            parser.add_argument(
+                'user',
+                help='User to shush',
+                type=str
+            )
+            parser.add_argument(
+                'time',
+                help='how long to shush the user (1h = 1 hour, 5m = 5 minutes, 30s = 30 seconds)',
+                type=str
+            )
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
+        return
+        
+    # Command stuff goes here
+    response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+    hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
+
+    if hasPermission:
+        id = getIDFromMention(args.user)
+        member = guild.get_member(id)
+        if member is None:
+            print('Failed to get member from guild, trying bot cache...')
+            from __main__ import bot
+            member = bot.cache.get_member(guild.id, id)
+        if member is None:
+            print('Failed to get member from guild or bot cache.')
+            await channel.send('*Failed to get member from guild or bot cache. Please wait a moment and try again or shush them manually.*')
+
+        if member is None:
+            response += 'Could not shush {}.'.format(args.user)
+        else:
+            # parse shush time
+            timeOk = True
+            for char in args.time:
+                if not char in '0123456789hms':
+                    timeOk = False
+            if len(args.time) <= 1: timeOk = False
+            try: timeNumber = int(args.time[0:-1])
+            except ValueError: timeOk = False
+            timeType = args.time[-1]
+            if not timeType in 'hms': timeOk = False
+
+            if not timeOk:
+                response += 'Invalid time value: `{}`'.format(args.time)
+            else:
+                timeTypeExpanded = {'h': 'hours', 'm': 'minutes', 's': 'seconds'}[timeType]
+                await member.edit(communication_disabled_until=(datetime.now() + timedelta(**{timeTypeExpanded: timeNumber})))
+                response += 'Shushed {} for {} {}.'.format(args.user, timeNumber, timeTypeExpanded)
+                await modLog(guild, '{}: {} shushed {} for {} {}.'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
+                await publishInfraction(guild, '{}: {} shushed {} for {} {}.'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
+
+    else:
+        response += 'You do not have permission to shush users.'
+        await modLog(guild, '{}: {} tried to shush {}.'.format(timestamp, sender.mention, args.user))
+
+    await channel.send(response)
+
+
 commands = {
     'info': (command_info, 'Show bot info: `{}info`'.format(commandPrefix)),
     'config': (command_config, 'View or change configuration (no usage example, only ever used by Cronk)'),
@@ -499,5 +570,6 @@ commands = {
     'warn': (command_warn, 'Warn a user or repeal a warning: `{}warn @user -n "note (remember the quotes)"`(warn somebody) | `{}warn @user -r <warning number>` (repeal a warning)'.format(commandPrefix, commandPrefix)),
     'warnings': (command_warnings, 'View a user\'s warnings: `{}warnings @user`'.format(commandPrefix)),
     'kick': (command_kick, 'Kick a user from the server: `{}kick @user`'.format(commandPrefix)),
-    'ban': (command_ban, 'Ban a user from the server: `{}ban @user`'.format(commandPrefix))
+    'ban': (command_ban, 'Ban a user from the server: `{}ban @user`'.format(commandPrefix)),
+    'shush': (command_shush, 'Shush a user: `{}shush @user`'.format(commandPrefix))
 }
