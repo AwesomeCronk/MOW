@@ -1,6 +1,5 @@
 from socket import gethostname
 import sys, contextlib, io, os, re
-from socket import gethostname
 
 import filesystem_database as fs_db
 import hikari

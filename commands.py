@@ -523,13 +523,8 @@ async def command_shush(event, *rawArgs):
     if hasPermission:
         id = getIDFromMention(args.user)
         member = guild.get_member(id)
-        if member is None:
-            print('Failed to get member from guild, trying bot cache...')
-            from __main__ import bot
-            member = bot.cache.get_member(guild.id, id)
-        if member is None:
-            print('Failed to get member from guild or bot cache.')
-            await channel.send('*Failed to get member from guild or bot cache. Please wait a moment and try again or shush them manually.*')
+        from __main__ import bot
+        if member is None: member = await bot.rest.fetch_member(guild, id)
 
         if member is None:
             response += 'Could not shush {}.'.format(args.user)
@@ -549,7 +544,9 @@ async def command_shush(event, *rawArgs):
                 response += 'Invalid time value: `{}`'.format(args.time)
             else:
                 timeTypeExpanded = {'h': 'hours', 'm': 'minutes', 's': 'seconds'}[timeType]
-                await member.edit(communication_disabled_until=(datetime.now() + timedelta(**{timeTypeExpanded: timeNumber})))
+                delta = timedelta(**{timeTypeExpanded: timeNumber}); print(delta)
+                shushedUntil = datetime.now() + delta; print(shushedUntil)
+                await member.edit(communication_disabled_until=(shushedUntil))
                 response += 'Shushed {} for {} {}.'.format(args.user, timeNumber, timeTypeExpanded)
                 await modLog(guild, '{}: {} shushed {} for {} {}.'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
                 await publishInfraction(guild, '{}: {} shushed {} for {} {}.'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
