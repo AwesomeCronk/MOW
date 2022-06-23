@@ -1,4 +1,5 @@
 import shlex, traceback
+from datetime import datetime
 
 import hikari
 
@@ -6,6 +7,7 @@ from utils import dbBotData, updatePrefixStatus
 from commands import commands
 
 runFlag = True
+startupTime = datetime.now()
 from uptime import StartUptimeTracking
 
 

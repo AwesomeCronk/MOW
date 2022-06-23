@@ -20,11 +20,14 @@ async def command_info(event, *rawArgs):
         print('argparse exited')
         return
 
+    from __main__ import startupTime
+
     batt = psutil.sensors_battery()
     info = [
         'Status: Online',
+        'Uptime: ' + str(datetime.now() - startupTime),
         'Host: {}@{}'.format(host[0], host[1]),
-        'Battery: {}% {}'.format('No battery' if batt is None else round(batt.percent, 2), '(plugged in)' if batt.power_plugged else '(on battery)'),
+        'Battery: {}% {}'.format('0' if batt is None else round(batt.percent, 2), '(no battery)' if batt is None else '(plugged in)' if batt.power_plugged else '(on battery)'),
         'CPU Temperature: {} ({})'.format(psutil.sensors_temperatures()['coretemp'][0].current, ', '.join([str(t.current) for t in psutil.sensors_temperatures()['coretemp'][1:]])),
         'Source code: <https://github.com/AwesomeCronk/MOW>'
     ]
@@ -531,7 +534,9 @@ async def command_shush(event, *rawArgs):
             response += 'Could not shush {}.'.format(args.user)
         else:
             # parse shush time
-            if args.time == 'none': await member.edit(communication_disabled_until=None)
+            if args.time == 'none':
+                await member.edit(communication_disabled_until=None)
+                await modLog(guild, '{}: {} unshushed {}'.format(timestamp, sender.mention, args.user))
             else:
                 timeOk = True
                 for char in args.time:
