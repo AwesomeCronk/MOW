@@ -1,5 +1,5 @@
 import argparse, hikari, psutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from utils import host, publishInfraction
 from utils import dbBotData, dbRules, dbWarnings
@@ -526,30 +526,33 @@ async def command_shush(event, *rawArgs):
         from __main__ import bot
         if member is None: member = await bot.rest.fetch_member(guild, id)
 
+        print(member)
         if member is None:
             response += 'Could not shush {}.'.format(args.user)
         else:
             # parse shush time
-            timeOk = True
-            for char in args.time:
-                if not char in '0123456789hms':
-                    timeOk = False
-            if len(args.time) <= 1: timeOk = False
-            try: timeNumber = int(args.time[0:-1])
-            except ValueError: timeOk = False
-            timeType = args.time[-1]
-            if not timeType in 'hms': timeOk = False
-
-            if not timeOk:
-                response += 'Invalid time value: `{}`'.format(args.time)
+            if args.time == 'none': await member.edit(communication_disabled_until=None)
             else:
-                timeTypeExpanded = {'h': 'hours', 'm': 'minutes', 's': 'seconds'}[timeType]
-                delta = timedelta(**{timeTypeExpanded: timeNumber}); print(delta)
-                shushedUntil = datetime.now() + delta; print(shushedUntil)
-                await member.edit(communication_disabled_until=(shushedUntil))
-                response += 'Shushed {} for {} {}.'.format(args.user, timeNumber, timeTypeExpanded)
-                await modLog(guild, '{}: {} shushed {} for {} {}.'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
-                await publishInfraction(guild, '{}: {} shushed {} for {} {}.'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
+                timeOk = True
+                for char in args.time:
+                    if not char in '0123456789hms':
+                        timeOk = False
+                if len(args.time) <= 1: timeOk = False
+                try: timeNumber = int(args.time[0:-1])
+                except ValueError: timeOk = False
+                timeType = args.time[-1]
+                if not timeType in 'hms': timeOk = False
+
+                if not timeOk:
+                    response += 'Invalid time value: `{}`'.format(args.time)
+                else:
+                    timeTypeExpanded = {'h': 'hours', 'm': 'minutes', 's': 'seconds'}[timeType]
+                    delta = timedelta(**{timeTypeExpanded: timeNumber}); print(delta)
+                    shushedUntil = datetime.now(timezone.utc) + delta; print(shushedUntil)
+                    await member.edit(communication_disabled_until=shushedUntil)
+                    response += 'Shushed {} for {} {}.'.format(args.user, timeNumber, timeTypeExpanded)
+                    await modLog(guild, '{}: {} shushed {} for {} {}.'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
+                    await publishInfraction(guild, '{}: {} shushed {} for {} {}.'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
 
     else:
         response += 'You do not have permission to shush users.'
