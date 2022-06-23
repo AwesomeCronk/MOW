@@ -576,5 +576,5 @@ commands = {
     'warnings': (command_warnings, 'View a user\'s warnings: `{}warnings @user`'.format(commandPrefix)),
     'kick': (command_kick, 'Kick a user from the server: `{}kick @user`'.format(commandPrefix)),
     'ban': (command_ban, 'Ban a user from the server: `{}ban @user`'.format(commandPrefix)),
-    'shush': (command_shush, 'Shush a user: `{}shush @user`'.format(commandPrefix))
+    'shush': (command_shush, 'Shush a user: `{}shush @user time` (see `{}shush --help` for time formatting)'.format(commandPrefix, commandPrefix))
 }
