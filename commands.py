@@ -251,13 +251,7 @@ async def command_warn(event, *rawArgs):
         # Get target user object
         
         member = guild.get_member(userID)
-        if member is None:
-            print('Failed to get member from guild, trying bot cache...')
-            from __main__ import bot
-            member = bot.cache.get_member(guild.id, userID)
-        if member is None:
-            print('Failed to get member from guild or bot cache.')
-            await channel.send('*Failed to get member from guild or bot cache. Please perform any role operations manually.*')
+        if member is None: from __main__ import bot; member = await bot.rest.fetch_member(guild, userID)
     
     # Ensure this user has a database entry, even if they have no warnings (empty entry)
     # It's a lot simpler than checking every third stage of the command
@@ -418,13 +412,7 @@ async def command_kick(event, *rawArgs):
         # Get target user object
         id = getIDFromMention(args.user)
         member = guild.get_member(id)
-        if member is None:
-            print('Failed to get member from guild, trying bot cache...')
-            from __main__ import bot
-            member = bot.cache.get_member(guild.id, id)
-        if member is None:
-            print('Failed to get member from guild or bot cache.')
-            await channel.send('*Failed to get member from guild or bot cache. Please wait a moment and try again or kick them manually.*')
+        if member is None: from __main__ import bot; member = await bot.rest.fetch_member(guild, id)
         
         if member is None:
             response += 'Could not kick {}.'.format(args.user)
@@ -470,13 +458,7 @@ async def command_ban(event, *rawArgs):
         # Get target user object
         id = getIDFromMention(args.user)
         member = guild.get_member(id)
-        if member is None:
-            print('Failed to get member from guild, trying bot cache...')
-            from __main__ import bot
-            member = bot.cache.get_member(guild.id, id)
-        if member is None:
-            print('Failed to get member from guild or bot cache.')
-            await channel.send('*Failed to get member from guild or bot cache. Please wait a moment and try again or ban them manually.*')
+        if member is None: from __main__ import bot; member = await bot.rest.fetch_member(guild, id)
         
         if member is None:
             response += 'Could not ban {}.'.format(args.user)
@@ -526,8 +508,7 @@ async def command_shush(event, *rawArgs):
     if hasPermission:
         id = getIDFromMention(args.user)
         member = guild.get_member(id)
-        from __main__ import bot
-        if member is None: member = await bot.rest.fetch_member(guild, id)
+        if member is None: from __main__ import bot; member = await bot.rest.fetch_member(guild, id)
 
         print(member)
         if member is None:
