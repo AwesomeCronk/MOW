@@ -40,8 +40,14 @@ def userMentionedSelf(sender, mention):
     if re.match("""^<@!?(\d+)>$""", str(mention)):
         return re.findall('\d+', sender.mention) == re.findall('\d+', mention)
 
-def getIDFromMention(mention):
-    if re.match('<@!?[0-9]{18}>$', mention):
+def getIDFromUserMention(mention):
+    if re.match('<@!?[0-9]*>$', mention):
+        return int(''.join(re.findall('[0-9]', mention)))
+    else:
+        raise ValueError('Malformed mention: "{}"'.format(mention))
+
+def getIDFromChannelMention(mention):
+    if re.match('<#!?[0-9]*>$', mention):
         return int(''.join(re.findall('[0-9]', mention)))
     else:
         raise ValueError('Malformed mention: "{}"'.format(mention))

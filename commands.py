@@ -3,9 +3,10 @@ from datetime import datetime, timedelta, timezone
 
 from utils import host, publishInfraction
 from utils import dbBotData, dbRules, dbWarnings
-from utils import userHasPermission, redirectIO, userMentionedSelf, modLog, updatePrefixStatus, getIDFromMention
+from utils import userHasPermission, redirectIO, userMentionedSelf, modLog, updatePrefixStatus, getIDFromUserMention, getIDFromChannelMention
 
 commandPrefix = dbBotData.get('prefix').decode()
+messageLengthLimit = 4000
 
 # Bot control/data commands
 async def command_info(event, *rawArgs):
@@ -122,6 +123,39 @@ async def command_help(event, *rawArgs):
         return
 
     await channel.send('\n'.join(['`{}{}` - {}'.format(commandPrefix, key, commands[key][1]) for key in commands.keys()]) + '\nFor help on a specific command, run that command with the argument `-h` or `--help`.')
+
+async def command_history(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+    guild = event.get_guild()
+    
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='history', description=commands['history'][1])
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
+        return
+
+    if userHasPermission(sender, guild, hikari.permissions.Permissions.MANAGE_MESSAGES):
+        await channel.send('Reading history file in {} character batches'.format(messageLengthLimit))
+        with open('history.txt', 'r') as historyFile:
+            batch = ''
+            while True:
+                nextEntry = historyFile.readline()
+                if nextEntry == '': break
+                if len(batch) + len(nextEntry) <= messageLengthLimit: batch += nextEntry
+                else:
+                    await channel.send(batch)
+                    batch = ''
+                    batch += nextEntry
+            if batch != '':
+                await channel.send(batch)
+
+    else:
+        await channel.send('You must have permission: MANAGE_MESSAGES to read off command history')
+            
 
 # Moderation commands
 async def command_rules(event, *rawArgs):
@@ -245,7 +279,7 @@ async def command_warn(event, *rawArgs):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
     warnings = []
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
-    userID = getIDFromMention(args.user)
+    userID = getIDFromUserMention(args.user)
 
     if hasPermission:
         # Get target user object
@@ -281,7 +315,7 @@ async def command_warn(event, *rawArgs):
                 await member.remove_role(warningRoleID)
 
         else:
-            response += 'You do not have permission repeal warnings.'
+            response += 'You do not have permission to repeal warnings.'
             await modLog(guild, '{}: {} tried to repeal warning {} for {}. (Note: {})'.format(timestamp, sender.mention, args.repeal[0], args.user, note))
 
     else:
@@ -354,7 +388,7 @@ async def command_warnings(event, *rawArgs):
         
     # Command stuff goes here
     response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
-    userID = getIDFromMention(args.user)
+    userID = getIDFromUserMention(args.user)
     # print(targetUser)
 
     warnings = []
@@ -410,7 +444,7 @@ async def command_kick(event, *rawArgs):
     
     if hasPermission:
         # Get target user object
-        id = getIDFromMention(args.user)
+        id = getIDFromUserMention(args.user)
         member = guild.get_member(id)
         if member is None: from __main__ import bot; member = await bot.rest.fetch_member(guild, id)
         
@@ -456,7 +490,7 @@ async def command_ban(event, *rawArgs):
     
     if hasPermission:
         # Get target user object
-        id = getIDFromMention(args.user)
+        id = getIDFromUserMention(args.user)
         member = guild.get_member(id)
         if member is None: from __main__ import bot; member = await bot.rest.fetch_member(guild, id)
         
@@ -506,7 +540,7 @@ async def command_shush(event, *rawArgs):
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
 
     if hasPermission:
-        id = getIDFromMention(args.user)
+        id = getIDFromUserMention(args.user)
         member = guild.get_member(id)
         if member is None: from __main__ import bot; member = await bot.rest.fetch_member(guild, id)
 
@@ -546,16 +580,56 @@ async def command_shush(event, *rawArgs):
 
     await channel.send(response)
 
+async def command_speak(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+    guild = event.get_guild()
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='speak', description=commands['speak'][1])
+            parser.add_argument(
+                'message',
+                help='What to say',
+                type=str
+            )
+            parser.add_argument(
+                '--channel',
+                '-c',
+                help='Channel to speak in',
+                type=str,
+                default='current'
+            )
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
+        return
+
+    if str(sender.id) == dbBotData.get('ownerID').decode():
+        print('Speaking "{}" in channel {}'.format(args.message, args.channel))
+        if args.channel == 'current': targetChannel = channel
+        else: targetChannel = guild.get_channel(getIDFromChannelMention(args.channel))
+
+        await targetChannel.send(args.message, user_mentions=True)
+        await channel.send('Message has been spoken')
+
+    else:
+        await channel.send('Refusing to speak, user is not owner')
+
 
 commands = {
     'info': (command_info, 'Show bot info: `{}info`'.format(commandPrefix)),
     'config': (command_config, 'View or change configuration (no usage example, only ever used by Cronk)'),
     'help': (command_help, 'Show help for all commands (please don\'t ask me to explain this one, just don\'t)'),
+    'history': (command_history, 'Read off the history file (SHOULD BE DONE IN <#891433717665497140>)'),
 
     'rules': (command_rules, 'Show or set rules: `{}rules` (to get server rules) | `{}rules -c #channel` (to get channel rules)'.format(commandPrefix, commandPrefix)),
     'warn': (command_warn, 'Warn a user or repeal a warning: `{}warn @user -n "note (remember the quotes)"`(warn somebody) | `{}warn @user -r <warning number>` (repeal a warning)'.format(commandPrefix, commandPrefix)),
     'warnings': (command_warnings, 'View a user\'s warnings: `{}warnings @user`'.format(commandPrefix)),
     'kick': (command_kick, 'Kick a user from the server: `{}kick @user`'.format(commandPrefix)),
     'ban': (command_ban, 'Ban a user from the server: `{}ban @user`'.format(commandPrefix)),
-    'shush': (command_shush, 'Shush a user: `{}shush @user time` (see `{}shush --help` for time formatting)'.format(commandPrefix, commandPrefix))
+    'shush': (command_shush, 'Shush a user: `{}shush @user time` (see `{}shush --help` for time formatting)'.format(commandPrefix, commandPrefix)),
+
+    'speak': (command_speak, 'Say something somewhere (Cronk only, don\'t try :P)')
 }
