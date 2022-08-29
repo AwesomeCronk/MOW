@@ -28,42 +28,43 @@ async def handleMessages(event):
     # print(repr(commandPrefix), repr(prefix))
 
     if prefix == commandPrefix:
+        proceed = True
         success = False
         text = event.content.strip()[len(commandPrefix):]
-        # print('Command "{}"'.format(text))
-        # print(repr(text))
+
         try:
             commandData = shlex.split(text.replace('“', '"').replace('”', '"')) # Replaces iOS quotes with normal quotes before splitting
             # print('split')
         except Exception as e:
             await event.get_channel().send('```python\n{}\n```'.format(traceback.format_exc()))
-            return
+            proceed = False
         
-        try:
-            command, *args = commandData
-            # print('parsed')
-        except ValueError:
-            await event.get_channel().send('must enter a command')
-            return
+        if proceed:
+            try:
+                command, *args = commandData
+                # print('parsed')
+            except ValueError:
+                await event.get_channel().send('must enter a command')
+                proceed = False
 
-        try:
-            function = commands[command][0]
-            # print('fetched')
-        except KeyError:
-            await event.get_channel().send('invalid command: "{}"'.format(command))
-            return
+        if proceed:
+            try:
+                function = commands[command][0]
+                # print('fetched')
+            except KeyError:
+                await event.get_channel().send('invalid command: "{}"'.format(command))
+                proceed = False
         
-        try:
-            await function(event, *args)
-            success = True
-            # print('executed')
-        except Exception as e:
-            await event.get_channel().send('```python\n{}\n```'.format(traceback.format_exc()))
-            print('Command "{}" failed.'.format(text))
-            return
+        if proceed:
+            try:
+                await function(event, *args)
+                success = True
+                # print('executed')
+            except BaseException as e:
+                await event.get_channel().send('```python\n{}\n```'.format(traceback.format_exc()))
 
         
-        record = '({}) {} issued command:\n{}\n'.format('SUCCESS' if success else 'FAILURE', event.author, event.content.strip())
+        record = '{}: ({}) {} issued command:\n{}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M'), 'SUCCESS' if success else 'FAILURE', event.author, event.content.strip())
         print(record)
         with open('history.txt', 'a') as historyFile:
             historyFile.write(record)
