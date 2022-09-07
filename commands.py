@@ -6,7 +6,6 @@ from utils import dbBotData, dbRules, dbWarnings
 from utils import userHasPermission, redirectIO, userMentionedSelf, modLog, updatePrefixStatus, getIDFromUserMention, getIDFromChannelMention
 
 commandPrefix = dbBotData.get('prefix').decode()
-messageLengthLimit = 4000
 
 # Bot control/data commands
 async def command_info(event, *rawArgs):
@@ -128,6 +127,8 @@ async def command_history(event, *rawArgs):
     sender = event.author
     channel = event.get_channel()
     guild = event.get_guild()
+
+    messageLengthLimit = int(dbBotData.get('messageLengthLimit').decode())
     
     try:
         with redirectIO() as (argparseOut, argparseErr):
