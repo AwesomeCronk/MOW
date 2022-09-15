@@ -627,7 +627,9 @@ async def command_speak(event, *rawArgs):
         print('argparse exited')
         return
 
-    if str(sender.id) == dbBotData.get('ownerID').decode():
+    allowedToSpeak = sender.id in [int(id) for id in dbBotData.get('allowedToSpeak').decode().split(' ')]
+
+    if allowedToSpeak:
         print('Speaking "{}" in channel {}'.format(args.message, args.channel))
         if args.channel == 'current': targetChannel = channel
         else: targetChannel = guild.get_channel(getIDFromChannelMention(args.channel))
@@ -636,7 +638,7 @@ async def command_speak(event, *rawArgs):
         await channel.send('Message has been spoken')
 
     else:
-        await channel.send('Refusing to speak, user is not owner')
+        await channel.send('Refusing to speak, you are not allowed to make me speak')
 
 
 commands = {
