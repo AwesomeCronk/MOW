@@ -5,6 +5,7 @@ from utils import host, publishInfraction
 from utils import dbBotData, dbRules, dbWarnings
 from utils import userHasPermission, redirectIO, userMentionedSelf, modLog, updatePrefixStatus, getIDFromUserMention, getIDFromChannelMention
 
+
 commandPrefix = dbBotData.get('prefix').decode()
 
 # Bot control/data commands
@@ -276,6 +277,8 @@ async def command_warn(event, *rawArgs):
         return
         
     # Command stuff goes here
+    from __main__ import bot
+
     response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
     warnings = []
@@ -286,7 +289,7 @@ async def command_warn(event, *rawArgs):
         # Get target user object
         
         member = guild.get_member(userID)
-        if member is None: from __main__ import bot; member = await bot.rest.fetch_member(guild, userID)
+        if member is None: member = await bot.rest.fetch_member(guild, userID)
     
     # Ensure this user has a database entry, even if they have no warnings (empty entry)
     # It's a lot simpler than checking every third stage of the command
@@ -321,20 +324,25 @@ async def command_warn(event, *rawArgs):
 
     else:
         if hasPermission:
-            warnings.append((timestamp, args.note[0]))
-            dbWarningsUser.mkNode(len(dbWarningsUser.nodes))
-            dbWarning = dbWarningsUser.node(len(dbWarningsUser.nodes) - 1)
-            dbWarning.mkKey(0, 'timestamp')
-            dbWarning.mkKey(1, 'note')
-            response += 'Warned {}{}'.format(args.user, ' (' + args.note[0] + ')' if args.note[0] != 'None' else '')
-            await modLog(guild, '{}: {} warned {}. (Note: {})'.format(timestamp, sender.mention, args.user, args.note[0]))
-            await publishInfraction(guild, '{}: {} warned {}. (Note: {})\nTotal: {} warnings'.format(timestamp, sender.mention, args.user, args.note[0], len(warnings)))
+            ownUser = await bot.rest.fetch_my_user()
+            print(ownUser)
+            if userID == ownUser.id:
+                response += 'No.'
+            else:
+                warnings.append((timestamp, args.note[0]))
+                dbWarningsUser.mkNode(len(dbWarningsUser.nodes))
+                dbWarning = dbWarningsUser.node(len(dbWarningsUser.nodes) - 1)
+                dbWarning.mkKey(0, 'timestamp')
+                dbWarning.mkKey(1, 'note')
+                response += 'Warned {}{}'.format(args.user, ' (' + args.note[0] + ')' if args.note[0] != 'None' else '')
+                await modLog(guild, '{}: {} warned {}. (Note: {})'.format(timestamp, sender.mention, args.user, args.note[0]))
+                await publishInfraction(guild, '{}: {} warned {}. (Note: {})\nTotal: {} warnings'.format(timestamp, sender.mention, args.user, args.note[0], len(warnings)))
 
         else:
             response += 'You do not have permission to issue warnings.'
             await modLog(guild, '{}: {} tried to warn {}. (Note: {})'.format(timestamp, sender.mention, args.user, args.note[0]))
 
-    if hasPermission:
+    if hasPermission and userID != ownUser.id:
         # Record warnings in the database
         for i, warning in enumerate(warnings):
             timestamp, note = warning
@@ -444,19 +452,25 @@ async def command_kick(event, *rawArgs):
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
     
     if hasPermission:
+        from __main__ import bot
+
         # Get target user object
         id = getIDFromUserMention(args.user)
         member = guild.get_member(id)
-        if member is None: from __main__ import bot; member = await bot.rest.fetch_member(guild, id)
+        ownUser = await bot.rest.fetch_my_user()
+        if member is None: member = await bot.rest.fetch_member(guild, id)
         
         if member is None:
             response += 'Could not kick {}.'.format(args.user)
         else:
-            await guild.kick(member.user)
+            if id == ownUser.id:
+                response += 'No.'
+            else:
+                await guild.kick(member.user)
 
-            response += 'kicked {}'.format(args.user)
-            await modLog(guild, '{}: {} kicked {}.'.format(timestamp, sender.mention, args.user))
-            await publishInfraction(guild, '{}: {} kicked {}.'.format(timestamp, sender.mention, args.user))
+                response += 'kicked {}'.format(args.user)
+                await modLog(guild, '{}: {} kicked {}.'.format(timestamp, sender.mention, args.user))
+                await publishInfraction(guild, '{}: {} kicked {}.'.format(timestamp, sender.mention, args.user))
     
     else:
         response += 'You do not have permission to kick users.'
@@ -490,19 +504,25 @@ async def command_ban(event, *rawArgs):
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
     
     if hasPermission:
+        from __main__ import bot
+
         # Get target user object
         id = getIDFromUserMention(args.user)
         member = guild.get_member(id)
-        if member is None: from __main__ import bot; member = await bot.rest.fetch_member(guild, id)
+        ownUser = await bot.rest.fetch_my_user()
+        if member is None: member = await bot.rest.fetch_member(guild, id)
         
         if member is None:
             response += 'Could not ban {}.'.format(args.user)
         else:
-            await guild.ban(member.user)
-            
-            response += 'Banned {}'.format(args.user)
-            await modLog(guild, '{}: {} banned {}.'.format(timestamp, sender.mention, args.user))
-            await publishInfraction(guild, '{}: {} banned {}.'.format(timestamp, sender.mention, args.user))
+            if id == ownUser.id:
+                response += 'No.'
+            else:
+                await guild.ban(member.user)
+                
+                response += 'Banned {}'.format(args.user)
+                await modLog(guild, '{}: {} banned {}.'.format(timestamp, sender.mention, args.user))
+                await publishInfraction(guild, '{}: {} banned {}.'.format(timestamp, sender.mention, args.user))
     
     else:
         response += 'You do not have permission to ban users.'
