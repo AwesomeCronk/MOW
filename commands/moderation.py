@@ -1,172 +1,19 @@
-import argparse, hikari, psutil
+import argparse, hikari
 from datetime import datetime, timedelta, timezone
 
-from utils import host, publishInfraction
-from utils import dbBotData, dbRules, dbWarnings
-from utils import userHasPermission, redirectIO, userMentionedSelf, modLog, updatePrefixStatus, getIDFromUserMention, getIDFromChannelMention
+from utils import dbBotData, dbRules, dbWarnings, dbLanguage
+from utils import redirectIO, modLog, publishInfraction, userHasPermission, userMentionedSelf, userMentionFromID, channelMentionFromID, getIDFromUserMention, getIDFromChannelMention
+
+from . import descriptions
 
 
-commandPrefix = dbBotData.get('prefix').decode()
-
-# Bot control/data commands
-async def command_info(event, *rawArgs):
-    channel = event.get_channel()
-    
-    try:
-        with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='info', description=commands['info'][1])
-            args = parser.parse_args(rawArgs)
-    except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
-        return
-
-    from __main__ import startupTime
-
-    batt = psutil.sensors_battery()
-    info = [
-        'Status: Online',
-        'Uptime: ' + str(datetime.now() - startupTime),
-        'Host: {}@{}'.format(host[0], host[1]),
-        'Battery: {}% {}'.format('0' if batt is None else round(batt.percent, 2), '(no battery)' if batt is None else '(plugged in)' if batt.power_plugged else '(on battery)'),
-        'CPU Temperature: {} ({})'.format(psutil.sensors_temperatures()['coretemp'][0].current, ', '.join([str(t.current) for t in psutil.sensors_temperatures()['coretemp'][1:]])),
-        'Source code: <https://github.com/AwesomeCronk/MOW>'
-    ]
-    await channel.send('\n'.join(info))
-
-async def command_config(event, *rawArgs):
-    sender = event.author
-    channel = event.get_channel()
-
-    try:
-        with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='config', description=commands['config'][1])
-            parser.add_argument(
-                'key',
-                help='Key to view or modify',
-                type=str
-            )
-            parser.add_argument(
-                '-s',
-                '--set',
-                help='Set the value of the key',
-                nargs=1,
-                action='store'
-            )
-            parser.add_argument(
-                '-c',
-                '--create',
-                help='Create the key',
-                action='store_true'
-            )
-            parser.add_argument(
-                '-r',
-                '--remove',
-                help='Remove the key',
-                action='store_true'
-            )
-            args = parser.parse_args(rawArgs)
-    except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
-        return
-
-    if args.key == 'token':
-        response = 'Value of `token` is `Cronk\'s token. Property of Cronk. Do not use except for Cronk.`'
-
-    elif userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
-        response = ''
-
-        if args.create:
-            # Get the first available key ID
-            for id in range(len(dbBotData.keys) + 1):
-                if not id in dbBotData.keys:
-                    break
-            # Create a key with it
-            dbBotData.mkKey(id, args.key)
-            response += 'Created `{}`\n'.format(args.key)
-
-
-        oldValue = dbBotData.get(args.key)
-        response += 'Value of `{}` is `{}`'.format(args.key, oldValue.decode() if oldValue else ' ')
-
-        if args.set:
-            dbBotData.set(args.key, args.set[0].encode())
-            newValue = dbBotData.get(args.key)
-            response += '\nValue of `{}` changed to `{}`'.format(args.key, newValue.decode())
-
-        if args.remove:
-            if args.key == 'prefix':    # Fail-safe to keep the bot from breaking entirely.
-                response += '\nYou cannot remove the prefix.'
-            else:
-                dbBotData.rmKey(args.key)
-                response += '\nRemoved `{}`'.format(args.key)
-
-    else:
-        response = 'You do not have permission to view or modify Maintenance of Way configuration.'
-
-    if args.key == 'prefix':
-        await updatePrefixStatus()
-
-    await channel.send(response)
-
-async def command_help(event, *rawArgs):
-    channel = event.get_channel()
-
-    try:
-        with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='help', description=commands['help'][1])
-            args = parser.parse_args(rawArgs)
-    except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
-        return
-
-    await channel.send('\n'.join(['`{}{}` - {}'.format(commandPrefix, key, commands[key][1]) for key in commands.keys()]) + '\nFor help on a specific command, run that command with the argument `-h` or `--help`.')
-
-async def command_history(event, *rawArgs):
-    sender = event.author
-    channel = event.get_channel()
-    guild = event.get_guild()
-
-    messageLengthLimit = int(dbBotData.get('messageLengthLimit').decode())
-    
-    try:
-        with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='history', description=commands['history'][1])
-            args = parser.parse_args(rawArgs)
-    except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
-        return
-
-    if userHasPermission(sender, guild, hikari.permissions.Permissions.MANAGE_MESSAGES):
-        await channel.send('Reading history file in {} character batches'.format(messageLengthLimit))
-        with open('history.txt', 'r') as historyFile:
-            batch = ''
-            while True:
-                nextEntry = historyFile.readline()
-                if nextEntry == '': break
-                if len(batch) + len(nextEntry) <= messageLengthLimit: batch += nextEntry
-                else:
-                    await channel.send(batch)
-                    batch = ''
-                    batch += nextEntry
-            if batch != '':
-                await channel.send(batch)
-
-    else:
-        await channel.send('You must have permission: MANAGE_MESSAGES to read off command history')
-            
-
-# Moderation commands
 async def command_rules(event, *rawArgs):
     sender = event.author
     channel = event.get_channel()
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='rules', description=commands['rules'][1])
+            parser = argparse.ArgumentParser(prog='rules', description=descriptions.rules)
             group = parser.add_mutually_exclusive_group()
             group.add_argument(
                 '-a',
@@ -197,7 +44,7 @@ async def command_rules(event, *rawArgs):
         return
         
     # Command stuff goes here
-    response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
+    response = ''
     targetChannel = args.channel[0]
     rules = []
 
@@ -220,6 +67,7 @@ async def command_rules(event, *rawArgs):
             response += 'Added rule for {}.'.format('server' if targetChannel == '<everywhere>' else targetChannel)
         else:
             response += 'You need permission: MANAGE_GUILD to add rules'
+
     elif args.remove:
         if userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
             del(rules[args.remove[0] - 1])
@@ -227,11 +75,13 @@ async def command_rules(event, *rawArgs):
             response += 'Removed rule for {}.'.format(targetChannel)
         else:
             response += 'You need permission: MANAGE_GUILD to remove rules'
+
     else:
         if targetChannel == '<everywhere>':
             response += 'Server rules:\n'
         else:
             response += 'Rules for channel {}:\n'.format(targetChannel)
+
         if len(rules):
             response += '\n'.join(['{}. {}'.format(i + 1, rules[i]) for i in range(len(rules))])
         else:
@@ -239,6 +89,7 @@ async def command_rules(event, *rawArgs):
     
     for i, rule in enumerate(rules):
         dbRulesChannel.set(i, rule.encode())
+
     await channel.send(response)
 
 async def command_warn(event, *rawArgs):
@@ -248,7 +99,7 @@ async def command_warn(event, *rawArgs):
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='warn', description=commands['warn'][1])
+            parser = argparse.ArgumentParser(prog='warn', description=descriptions.warn)
             group = parser.add_mutually_exclusive_group()
             parser.add_argument(
                 'user',
@@ -266,7 +117,7 @@ async def command_warn(event, *rawArgs):
             group.add_argument(
                 '-r',
                 '--repeal',
-                help='Repeal the last warning for a user',
+                help='Repeal the specified warning for a user',
                 nargs=1,
                 type=int
             )
@@ -279,11 +130,12 @@ async def command_warn(event, *rawArgs):
     # Command stuff goes here
     from __main__ import bot
 
-    response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
+    response = ''
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
     warnings = []
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
     userID = getIDFromUserMention(args.user)
+    ownUser = await bot.rest.fetch_my_user()
 
     if hasPermission:
         # Get target user object
@@ -324,8 +176,6 @@ async def command_warn(event, *rawArgs):
 
     else:
         if hasPermission:
-            ownUser = await bot.rest.fetch_my_user()
-            print(ownUser)
             if userID == ownUser.id:
                 response += 'No.'
             else:
@@ -377,7 +227,7 @@ async def command_warnings(event, *rawArgs):
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='warnings', description=commands['warnings'][1])
+            parser = argparse.ArgumentParser(prog='warnings', description=descriptions.warnings)
             parser.add_argument(
                 'user',
                 help='User for whom to view warnings',
@@ -396,7 +246,7 @@ async def command_warnings(event, *rawArgs):
         return
         
     # Command stuff goes here
-    response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
+    response = ''
     userID = getIDFromUserMention(args.user)
     # print(targetUser)
 
@@ -432,7 +282,7 @@ async def command_kick(event, *rawArgs):
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='kick', description=commands['kick'][1])
+            parser = argparse.ArgumentParser(prog='kick', description=descriptions.kick)
             group = parser.add_mutually_exclusive_group()
             parser.add_argument(
                 'user',
@@ -446,7 +296,7 @@ async def command_kick(event, *rawArgs):
         return
         
     # Command stuff goes here
-    response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
+    response = ''
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
 
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
@@ -485,7 +335,7 @@ async def command_ban(event, *rawArgs):
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='ban', description=commands['ban'][1])
+            parser = argparse.ArgumentParser(prog='ban', description=descriptions.ban)
             parser.add_argument(
                 'user',
                 help='User to ban',
@@ -498,7 +348,7 @@ async def command_ban(event, *rawArgs):
         return
         
     # Command stuff goes here
-    response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
+    response = ''
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
 
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
@@ -537,7 +387,7 @@ async def command_shush(event, *rawArgs):
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='shush', description=commands['shush'][1])
+            parser = argparse.ArgumentParser(prog='shush', description=descriptions.shush)
             parser.add_argument(
                 'user',
                 help='User to shush',
@@ -555,7 +405,7 @@ async def command_shush(event, *rawArgs):
         return
         
     # Command stuff goes here
-    response = '**WARNING: CURRENT DATABASE IS NOT MAIN DATABASE!!**\n' if host != ('botman', 'Inspiron15-3552') else ''
+    response = ''
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
 
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
@@ -601,25 +451,46 @@ async def command_shush(event, *rawArgs):
 
     await channel.send(response)
 
-async def command_speak(event, *rawArgs):
+async def command_language(event, *rawArgs):
     sender = event.author
     channel = event.get_channel()
     guild = event.get_guild()
 
     try:
         with redirectIO() as (argparseOut, argparseErr):
-            parser = argparse.ArgumentParser(prog='speak', description=commands['speak'][1])
+            parser = argparse.ArgumentParser(prog='language', description=descriptions.language)
             parser.add_argument(
-                'message',
-                help='What to say',
+                '-t',
+                '--toggle',
+                help='Toggle filter on/off',
+                action='store_true'
+            )
+            parser.add_argument(
+                '-l',
+                '--list',
+                help='List keywords and exclusions',
+                action='store_true'
+            )
+            parser.add_argument(
+                '-r',
+                '--remove',
+                help='Remove a keyword',
+                nargs=1,
+                type=int
+            )
+            parser.add_argument(
+                '-a',
+                '--add',
+                help='Add a keyword',
+                nargs=1,
                 type=str
             )
             parser.add_argument(
-                '--channel',
-                '-c',
-                help='Channel to speak in',
-                type=str,
-                default='current'
+                '-x',
+                '--exclude',
+                help='Change an exclusion',
+                nargs=1,
+                type=str
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
@@ -627,32 +498,73 @@ async def command_speak(event, *rawArgs):
         print('argparse exited')
         return
 
-    allowedToSpeak = sender.id in [int(id) for id in dbBotData.get('allowedToSpeak').decode().split(' ')]
+    response = ''
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+    hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
+    dbExcludeUsers = dbLanguage.node('excludeUsers')
+    dbExcludeChannels = dbLanguage.node('excludeChannels')
+    dbKeywords = dbLanguage.node('keywords')
+    
+    if hasPermission:
+        # Print current keywords, status, etc
+        response += 'Language filter status: {}'.format('on' if dbLanguage.get('active') != b'\x00' else 'off')
 
-    if allowedToSpeak:
-        print('Speaking "{}" in channel {}'.format(args.message, args.channel))
-        if args.channel == 'current': targetChannel = channel
-        else: targetChannel = guild.get_channel(getIDFromChannelMention(args.channel))
+        if args.toggle:
+            dbLanguage.set('active', b'\xff' if dbLanguage.get('active') == b'\x00' else b'\x00')
+            response += '\nToggled language filter {}'.format('on' if dbLanguage.get('active') != b'\x00' else 'off')
+            await modLog(guild, '{} toggled language filter {}'.format(sender.mention, 'on' if dbLanguage.get('active') != b'\x00' else 'off'))
 
-        await targetChannel.send(args.message, user_mentions=True)
-        await channel.send('Message has been spoken')
+        if args.list:
+            response += '\nKeywords:\n{}'.format('\n'.join(['{}: `{}`'.format(k + 1, dbKeywords.get(key).decode()) for k, key in enumerate(dbKeywords.keys)]))
+            response += '\nUser exclusions:\n{}'.format(', '.join([userMentionFromID(userID) for userID in dbExcludeUsers.keyNames.keys()]))
+            response += '\nChannel exclusions:\n{}'.format(', '.join([channelMentionFromID(channelID) for channelID in dbExcludeChannels.keyNames.keys()]))
+
+        if args.remove:
+            dbKeywords.rmKey(args.remove[0] - 1)
+            response += '\nRemoved keyword {}'.format(args.remove[0])
+            await modLog(guild, '{} removed keyword `{}`'.format(sender.mention, args.remove[0]))
+
+        if args.add:
+            id = 0
+            for key in dbKeywords.keys:
+                if key >= id: id = key + 1
+
+            dbKeywords.mkKey(id)
+            dbKeywords.set(id, args.add[0].encode())
+            response += '\nAdded keyword `{}`'.format(args.add[0])
+            await modLog(guild, '{} added keyword `{}`'.format(sender.mention, args.add[0]))
+
+        if args.exclude:
+            try: userID = str(getIDFromUserMention(args.exclude[0]))
+            except: userID = None
+            try: channelID = str(getIDFromChannelMention(args.exclude[0]))
+            except: channelID = None
+
+            print(userID, channelID)
+
+            if not userID is None:
+                if str(userID) in dbExcludeUsers.keyNames.keys():
+                    dbExcludeUsers.rmKey(str(userID))
+                    response += '\nRemoved exclusion for {}'.format(args.exclude[0])
+                else:
+                    id = 0
+                    for key in dbExcludeUsers.keys:
+                        if key >= id: id = key + 1
+                    dbExcludeUsers.mkKey(id, str(userID))
+                    response += '\nAdded exclusion for {}'.format(args.exclude[0])
+
+            elif not channelID is None:
+                if str(channelID) in dbExcludeChannels.keyNames.keys():
+                    dbExcludeChannels.rmKey(str(channelID))
+                    response += '\nRemoved exclusion for {}'.format(args.exclude[0])
+                else:
+                    id = 0
+                    for key in dbExcludeChannels.keys:
+                        if key >= id: id = key + 1
+                    dbExcludeChannels.mkKey(id, str(channelID))
+                    response += '\nAdded exclusion for {}'.format(args.exclude[0])
 
     else:
-        await channel.send('Refusing to speak, you are not allowed to make me speak')
+        response += 'You do not have permission to configure the language filter.'
 
-
-commands = {
-    'info': (command_info, 'Show bot info: `{}info`'.format(commandPrefix)),
-    'config': (command_config, 'View or change configuration (no usage example, only ever used by Cronk)'),
-    'help': (command_help, 'Show help for all commands (please don\'t ask me to explain this one, just don\'t)'),
-    'history': (command_history, 'Read off the history file (SHOULD BE DONE IN <#891433717665497140>)'),
-
-    'rules': (command_rules, 'Show or set rules: `{}rules` (to get server rules) | `{}rules -c #channel` (to get channel rules)'.format(commandPrefix, commandPrefix)),
-    'warn': (command_warn, 'Warn a user or repeal a warning: `{}warn @user -n "note (remember the quotes)"`(warn somebody) | `{}warn @user -r <warning number>` (repeal a warning)'.format(commandPrefix, commandPrefix)),
-    'warnings': (command_warnings, 'View a user\'s warnings: `{}warnings @user`'.format(commandPrefix)),
-    'kick': (command_kick, 'Kick a user from the server: `{}kick @user`'.format(commandPrefix)),
-    'ban': (command_ban, 'Ban a user from the server: `{}ban @user`'.format(commandPrefix)),
-    'shush': (command_shush, 'Shush a user: `{}shush @user time` (see `{}shush --help` for time formatting)'.format(commandPrefix, commandPrefix)),
-
-    'speak': (command_speak, 'Say something somewhere (Cronk only, don\'t try :P)')
-}
+    await channel.send(response)

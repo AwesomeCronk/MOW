@@ -10,6 +10,7 @@ dbRoot = fs_db.dbNode('./database')
 dbRules = dbRoot.node('rules')
 dbWarnings = dbRoot.node('warnings')
 dbBotData = dbRoot.node('botData')
+dbLanguage = dbRoot.node('language')
 
 @contextlib.contextmanager
 def redirectIO():
@@ -39,6 +40,10 @@ def userHasPermission(user, guild, permission):
 def userMentionedSelf(sender, mention):
     if re.match("""^<@!?(\d+)>$""", str(mention)):
         return re.findall('\d+', sender.mention) == re.findall('\d+', mention)
+
+def userMentionFromID(id): return '<@{}>'.format(id)
+
+def channelMentionFromID(id): return '<#{}>'.format(id)
 
 def getIDFromUserMention(mention):
     if re.match('<@!?[0-9]*>$', mention):
