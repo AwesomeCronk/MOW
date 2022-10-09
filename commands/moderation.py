@@ -520,8 +520,10 @@ async def command_language(event, *rawArgs):
             response += '\nChannel exclusions:\n{}'.format(', '.join([channelMentionFromID(channelID) for channelID in dbExcludeChannels.keyNames.keys()]))
 
         if args.remove:
-            dbKeywords.rmKey(args.remove[0] - 1)
-            response += '\nRemoved keyword {}'.format(args.remove[0])
+            keyID = dbKeywords.keys[args.remove[0] - 1]
+            keyword = dbKeywords.get(keyID)
+            dbKeywords.rmKey(keyID)
+            response += '\nRemoved keyword {} (`{}`)'.format(args.remove[0], keyword)
             await modLog(guild, '{} removed keyword `{}`'.format(sender.mention, args.remove[0]))
 
         if args.add:
