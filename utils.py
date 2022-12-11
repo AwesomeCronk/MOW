@@ -6,12 +6,15 @@ import hikari
 
 host = (os.getlogin(), gethostname())
 
+# Database nodes
 dbRoot = fs_db.dbNode('./database')
 dbRules = dbRoot.node('rules')
 dbWarnings = dbRoot.node('warnings')
 dbBotData = dbRoot.node('botData')
 dbLanguage = dbRoot.node('language')
 
+
+# IO redirector to keep argparse from shutting down the bot
 @contextlib.contextmanager
 def redirectIO():
     stdoutOld = sys.stdout
@@ -26,6 +29,7 @@ def redirectIO():
         sys.stdout = stdoutOld
         sys.stderr = stderrOld
 
+
 def userHasPermission(user, guild, permission):
     member = guild.get_member(user)
     memberRoles = member.role_ids
@@ -37,6 +41,8 @@ def userHasPermission(user, guild, permission):
             return True     # Return True if a role with the desired permission is found among the user's roles in this guild
     return False
 
+
+### Parsing ###
 def userMentionedSelf(sender, mention):
     if re.match("""^<@!?(\d+)>$""", str(mention)):
         return re.findall('\d+', sender.mention) == re.findall('\d+', mention)
@@ -57,6 +63,8 @@ def getIDFromChannelMention(mention):
     else:
         raise ValueError('Malformed mention: "{}"'.format(mention))
 
+
+### Logging/documentation ###
 async def modLog(guild, message):
     await guild.get_channel(int(dbBotData.get('modLogsChannel').decode())).send(message)
 

@@ -65,8 +65,7 @@ async def handleMessages(event):
             
             if proceed:
                 try:
-                    await function(event, *args)
-                    success = True
+                    success = await function(event, *args)
                     # print('executed')
                 except BaseException as e:
                     await event.get_channel().send('```python\n{}\n```'.format(traceback.format_exc()))
