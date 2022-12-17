@@ -1,4 +1,4 @@
-import argparse, psutil, hikari
+import argparse, platform, psutil, hikari
 from datetime import datetime
 
 from utils import dbBotData, host
@@ -27,6 +27,8 @@ async def command_info(event, *rawArgs):
     batt = psutil.sensors_battery()
     info = [
         'Status: Online',
+        'Python version: {}'.format(platform.python_version()),
+        'Hikari version: {}'.format(hikari.__version__),
         'Uptime: ' + str(datetime.now() - startupTime),
         'Host: {}@{}'.format(host[0], host[1]),
         'Battery: {}% {}'.format('0' if batt is None else round(batt.percent, 2), '(no battery)' if batt is None else '(plugged in)' if batt.power_plugged else '(on battery)'),
@@ -35,6 +37,7 @@ async def command_info(event, *rawArgs):
     ]
     await channel.send('\n'.join(info))
     return True
+
 
 async def command_config(event, *rawArgs):
     sender = event.author
@@ -79,6 +82,13 @@ async def command_config(event, *rawArgs):
 
     if args.key == 'token':
         response = 'Value of `token` is `Cronk\'s token. Property of Cronk. Do not use except for Cronk.`'
+    elif args.key == '*':
+        response = 'Values of all keys:'
+        for id in dbBotData.keys:
+            name = dbBotData.getKeyName(id)
+            if name == 'token': value = 'Cronk\'s token. Property of Cronk. Do not use except for Cronk.'
+            else: value = dbBotData.get(id).decode()
+            response += '\n{} - "{}": `{}`'.format(id, name, value)
     else:
         response = ''
 
@@ -112,6 +122,7 @@ async def command_config(event, *rawArgs):
     await channel.send(response)
     return True
 
+
 async def command_help(event, *rawArgs):
     channel = event.get_channel()
 
@@ -129,6 +140,7 @@ async def command_help(event, *rawArgs):
         '\n'.join(['`{}{}` - {}'.format(commandPrefix, command, getattr(descriptions, command)) for command in ['info', 'config', 'help', 'history', 'rules', 'warn', 'warnings', 'kick', 'ban', 'shush', 'language', 'speak']])
         + '\nFor help on a specific command, run that command with the argument `-h` or `--help`.'
     )
+
 
 async def command_history(event, *rawArgs):
     sender = event.author

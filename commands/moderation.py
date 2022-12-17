@@ -347,7 +347,7 @@ async def command_ban(event, *rawArgs):
     response = ''
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
     
-    if not userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES):
+    if not userHasPermission(sender, guild, hikari.permissions.Permissions.MANAGE_MESSAGES):
         await channel.send('You do not have permission to ban users')
         await modLog(guild, '{}: {} tried to ban {}'.format(timestamp, sender.mention, args.user))
         return False

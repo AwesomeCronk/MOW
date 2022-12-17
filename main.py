@@ -33,8 +33,6 @@ async def handleMessages(event):
         commandPrefix = dbBotData.get('prefix').decode()
         prefix = event.content.strip()[0:len(commandPrefix)]
 
-        # print(repr(commandPrefix), repr(prefix))
-
         if prefix == commandPrefix:
             proceed = True
             success = False
@@ -42,7 +40,7 @@ async def handleMessages(event):
 
             try:
                 commandData = shlex.split(text.replace('“', '"').replace('”', '"')) # Replaces iOS quotes with normal quotes before splitting
-                # print('split')
+            
             except Exception as e:
                 await event.get_channel().send('```python\n{}\n```'.format(traceback.format_exc()))
                 proceed = False
@@ -50,7 +48,7 @@ async def handleMessages(event):
             if proceed:
                 try:
                     command, *args = commandData
-                    # print('parsed')
+                    
                 except ValueError:
                     await event.get_channel().send('must enter a command')
                     proceed = False
@@ -58,7 +56,7 @@ async def handleMessages(event):
             if proceed:
                 try:
                     function = commands[command]
-                    # print('fetched')
+                    
                 except KeyError:
                     await event.get_channel().send('invalid command: "{}"'.format(command))
                     proceed = False
@@ -66,7 +64,7 @@ async def handleMessages(event):
             if proceed:
                 try:
                     success = await function(event, *args)
-                    # print('executed')
+                    
                 except BaseException as e:
                     await event.get_channel().send('```python\n{}\n```'.format(traceback.format_exc()))
 
