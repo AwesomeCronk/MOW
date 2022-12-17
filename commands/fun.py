@@ -1,6 +1,7 @@
 import argparse
 
 from utils import dbBotData, getIDFromChannelMention, redirectIO
+import language
 
 from . import descriptions
 
@@ -33,6 +34,11 @@ async def command_speak(event, *rawArgs):
 
     if not sender.id in [int(id) for id in dbBotData.get('allowedToSpeak').decode().split(' ')]:
         await channel.send('Refusing to speak, you are not allowed to make me speak')
+        return False
+
+    languageMatch = language.examineStr(args.message)
+    if languageMatch != None:
+        await channel.send('Refusing to speak, does not pass language filter')
         return False
 
     print('Speaking "{}" in channel {}'.format(args.message, args.channel))
