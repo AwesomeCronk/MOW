@@ -294,7 +294,7 @@ async def command_kick(event, *rawArgs):
     response = ''
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
     
-    if not userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES):
+    if not userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.KICK_MEMBERS):
         response += 'You do not have permission to kick users.'
         await modLog(guild, '{}: {} tried to kick {}.'.format(timestamp, sender.mention, args.user))
         return False
@@ -343,11 +343,10 @@ async def command_ban(event, *rawArgs):
         print('argparse exited')
         return
         
-    # Command stuff goes here
     response = ''
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
     
-    if not userHasPermission(sender, guild, hikari.permissions.Permissions.MANAGE_MESSAGES):
+    if not userHasPermission(sender, guild, hikari.permissions.Permissions.BAN_MEMBERS):
         await channel.send('You do not have permission to ban users')
         await modLog(guild, '{}: {} tried to ban {}'.format(timestamp, sender.mention, args.user))
         return False
@@ -574,6 +573,57 @@ async def command_language(event, *rawArgs):
     await channel.send(response)
     return True
 
+
+async def command_embed_verify(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+    guild = event.get_guild()
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='embed-verify', description=descriptions.embed_verify)
+            parser.add_argument(
+                'user',
+                help='User to verify',
+                type=str
+            )
+            parser.add_argument(
+                '-u',
+                '--unverify',
+                help='Unverify the user',
+                action='store_true'
+            )
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
+        return
+        
+    from __main__ import bot
+
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+    if not userHasPermission(sender, guild, hikari.permissions.Permissions.MANAGE_CHANNELS):
+        await channel.send('You do not have permission to embed verify users')
+        await modLog(guild, '{}: {} tried to embed verify {}'.format(timestamp, sender.mention, args.user))
+        return False
+
+    # Get target user object
+    member = guild.get_member(getIDFromUserMention(args.user))
+    if member is None: member = await bot.rest.fetch_member(guild, args.user)
+    if member is None: await channel.send('Unable to verify member due to API problem'); return False
+
+    if args.unverify:
+        await member.remove_role(int(dbBotData.get('embedVerifiedRole').decode()))
+        await channel.send('Removed embed verification for {}'.format(args.user))
+        await modLog(guild, '{}: {} removed embed verification for {}'.format(timestamp, sender, args.user))
+        return True
+
+    await member.add_role(int(dbBotData.get('embedVerifiedRole').decode()))
+    await channel.send('Embed Verified {}'.format(args.user))
+    await modLog(guild, '{}: {} embed verified {}'.format(timestamp, sender, args.user))
+    return True
+        
 
 async def command_clear_alike(event, *rawArgs):
     sender = event.author

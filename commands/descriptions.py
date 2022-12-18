@@ -15,6 +15,7 @@ kick = 'Kick a user from the server: `{}kick @user`'.format(commandPrefix)
 ban = 'Ban a user from the server: `{}ban @user`'.format(commandPrefix)
 shush = 'Shush a user: `{}shush @user time` (see `{}shush --help` for time formatting)'.format(commandPrefix, commandPrefix)
 language = 'Configure the language filter'
+embed_verify = 'Verify or unverify embed permissions in general channels for a user'
 clear_alike = 'Clear all messages in all channels with the same content'
 
 speak = 'Say something somewhere (access restricted for safety reasons)'

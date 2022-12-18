@@ -137,9 +137,12 @@ async def command_help(event, *rawArgs):
     #     return False
 
     await channel.send(
-        '\n'.join(['`{}{}` - {}'.format(commandPrefix, command, getattr(descriptions, command)) for command in ['info', 'config', 'help', 'history', 'rules', 'warn', 'warnings', 'kick', 'ban', 'shush', 'language', 'speak']])
+        '\n'.join(['`{}{}` - {}'.format(commandPrefix, command, getattr(descriptions, command.replace('-', '_'))) for command in [
+            'info', 'config', 'help', 'history', 'rules', 'warn', 'warnings', 'kick', 'ban', 'shush', 'language', 'embed-verify', 'clear-alike', 'speak'
+            ]])
         + '\nFor help on a specific command, run that command with the argument `-h` or `--help`.'
     )
+    return True
 
 
 async def command_history(event, *rawArgs):

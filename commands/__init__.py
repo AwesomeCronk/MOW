@@ -15,6 +15,7 @@ commands = {
     'ban': command_ban,
     'shush': command_shush,
     'language': command_language,
+    'embed-verify': command_embed_verify,
     'clear-alike': command_clear_alike,
 
     'speak': command_speak
