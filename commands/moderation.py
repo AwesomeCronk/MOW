@@ -337,13 +337,20 @@ async def command_ban(event, *rawArgs):
                 help='User to ban',
                 type=str
             )
+            parser.add_argument(
+                '-n',
+                '--note',
+                help='Record a note for a ban',
+                nargs=1,
+                type=str,
+                default=['None']
+            )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
         await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         print('argparse exited')
         return
-        
-    response = ''
+
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
     
     if not userHasPermission(sender, guild, hikari.permissions.Permissions.BAN_MEMBERS):
@@ -366,13 +373,11 @@ async def command_ban(event, *rawArgs):
         await channel.send('No.')
         return False
     
-    await guild.ban(member.user)
+    await guild.ban(member.user, reason=args.note[0])
     
-    response += 'Banned {}'.format(args.user)
-    await modLog(guild, '{}: {} banned {}.'.format(timestamp, sender.mention, args.user))
-    await publishInfraction(guild, '{}: {} banned {}.'.format(timestamp, sender.mention, args.user))
-    
-    await channel.send(response)
+    await channel.send('Banned {}'.format(args.user))
+    await modLog(guild, '{}: {} banned {} ({})'.format(timestamp, sender.mention, args.user, args.note[0]))
+    await publishInfraction(guild, '{}: {} banned {} ({})'.format(timestamp, sender.mention, args.user, args.note[0]))
     return True
 
 
