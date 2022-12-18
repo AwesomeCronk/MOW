@@ -208,10 +208,10 @@ async def command_warn(event, *rawArgs):
 
         # Auto-kick / auto-ban
         if dbBotData.get('autoKickEnabled') == b'yes' and len(warnings) == 3:
-            await member.kick()
+            await guild.kick(member.user)
             response += '\n{} was kicked automatically.'.format(args.user)
         if dbBotData.get('autoBanEnabled') == b'yes' and len(warnings) == 4:
-            await member.ban()
+            await guild.ban(member.user, reason='Out of warnings')
             response += '\n{} was banned automatically.'.format(args.user)
 
     await channel.send(response)
@@ -447,9 +447,9 @@ async def command_shush(event, *rawArgs):
         delta = timedelta(**{timeTypeExpanded: timeNumber}); print(delta)
         shushedUntil = datetime.now(timezone.utc) + delta; print(shushedUntil)
         await member.edit(communication_disabled_until=shushedUntil)
-        response += 'Shushed {} for {} {}.'.format(args.user, timeNumber, timeTypeExpanded)
-        await modLog(guild, '{}: {} shushed {} for {} {}.'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
-        await publishInfraction(guild, '{}: {} shushed {} for {} {}.'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
+        response += 'Shushed {} for {} {} {}'.format(args.user, timeNumber, timeTypeExpanded, dbBotData.get('emoteShut').decode())
+        await modLog(guild, '{}: {} shushed {} for {} {}'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
+        await publishInfraction(guild, '{}: {} shushed {} for {} {}'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
 
     await channel.send(response)
     return True
