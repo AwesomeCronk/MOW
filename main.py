@@ -14,7 +14,7 @@ from uptime import StartUptimeTracking
 
 bot = hikari.GatewayBot(
     token=dbBotData.get('token').decode(),
-    intents=hikari.Intents.ALL_UNPRIVILEGED | hikari.Intents.MESSAGE_CONTENT
+    intents=hikari.Intents.ALL_UNPRIVILEGED | hikari.Intents.MESSAGE_CONTENT | hikari.Intents.GUILD_MEMBERS
 )
 
 @bot.listen(hikari.events.lifetime_events.StartedEvent)

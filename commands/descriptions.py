@@ -19,3 +19,4 @@ embed_verify = 'Verify or unverify embed permissions in general channels for a u
 clear_alike = 'Clear all messages in all channels with the same content'
 
 speak = 'Say something somewhere (access restricted for safety reasons)'
+impostercronk = ''

@@ -49,3 +49,28 @@ async def command_speak(event, *rawArgs):
     await channel.send('Message has been spoken')
     return True
         
+async def command_impostercronk(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+    guild = event.get_guild()
+
+    if sender.id != int(dbBotData.get('ownerID').decode()):
+        await channel.send('Can only be run by my owner')
+        return False
+
+    adjusted = []
+    unadjusted = []
+    for memberID in guild.get_members():
+        member = guild.get_member(memberID)
+        if not member is None:
+            if member.nickname == 'AwesomeCronk':
+                try:
+                    await member.edit(nickname='ImposterCronk')
+                    adjusted.append(member)
+                except:
+                    unadjusted.append(member)
+
+    if len(adjusted): await channel.send('Adjusted nicknames for:\n{}'.format('\n'.join([str(culprit) for culprit in adjusted])))
+    if len(unadjusted): await channel.send('Could not adjust nicknames for:\n{}'.format('\n'.join([str(culprit) for culprit in unadjusted])))
+
+    return True

@@ -18,5 +18,6 @@ commands = {
     'embed-verify': command_embed_verify,
     'clear-alike': command_clear_alike,
 
-    'speak': command_speak
+    'speak': command_speak,
+    'impostercronk': command_impostercronk
 }
