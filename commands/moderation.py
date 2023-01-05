@@ -59,7 +59,7 @@ async def command_rules(event, *rawArgs):
     for key in dbRulesChannel.keys:
         rules.append(dbRulesChannel.get(key).decode())
     
-    if (args.add or args.remove) and userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
+    if (args.add or args.remove) and not userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
         await channel.send('You need permission: MANAGE_GUILD to manage rules')
         return False
 
