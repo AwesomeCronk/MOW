@@ -31,6 +31,8 @@ async def handleMessageEdits(event):
         try: await event.message.delete()
         except: pass
         await modLog(event.get_guild(), 'Language filter caught {} via edit in {} (keyword: `{}`):\n> {}'.format(event.author.mention, event.get_channel().mention, languageMatch, event.content))
+        try: await event.author.send('Sorry, but that word has been blocked!')
+        except: pass
         return
 
 @bot.listen(hikari.GuildMessageCreateEvent)
@@ -43,6 +45,8 @@ async def handleMessages(event):
         try: await event.message.delete()
         except: pass
         await modLog(event.get_guild(), 'Language filter caught {} in {} (keyword: `{}`):\n> {}'.format(event.author.mention, event.get_channel().mention, languageMatch, event.content))
+        try: await event.author.send('Sorry, but that word has been blocked!')
+        except: pass
         return
 
     commandPrefix = dbBotData.get('prefix').decode()
