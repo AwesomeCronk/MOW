@@ -21,6 +21,18 @@ bot = hikari.GatewayBot(
 async def startup(event):
     await updatePrefixStatus()
 
+@bot.listen(hikari.GuildMessageUpdateEvent)
+async def handleMessageEdits(event):
+    if event.content is None:
+        return
+    
+    languageMatch = language.examineEvent(event)
+    if languageMatch != None:
+        try: await event.message.delete()
+        except: pass
+        await modLog(event.get_guild(), 'Language filter caught {} via edit in {} (keyword: `{}`):\n> {}'.format(event.author.mention, event.get_channel().mention, languageMatch, event.content))
+        return
+
 @bot.listen(hikari.GuildMessageCreateEvent)
 async def handleMessages(event):
     if event.content is None:
@@ -30,7 +42,7 @@ async def handleMessages(event):
     if languageMatch != None:
         try: await event.message.delete()
         except: pass
-        await modLog(event.get_guild(), 'Language filter caught {} (keyword: `{}`):\n> {}'.format(event.author, languageMatch, event.content))
+        await modLog(event.get_guild(), 'Language filter caught {} in {} (keyword: `{}`):\n> {}'.format(event.author.mention, event.get_channel().mention, languageMatch, event.content))
         return
 
     commandPrefix = dbBotData.get('prefix').decode()
