@@ -6,6 +6,7 @@ from utils import userHasPermission, redirectIO, updatePrefixStatus
 
 from . import descriptions
 
+
 commandPrefix = dbBotData.get('prefix').decode()
 
 
@@ -25,11 +26,14 @@ async def command_info(event, *rawArgs):
     from __main__ import startupTime
 
     batt = psutil.sensors_battery()
+    bootTime = psutil.boot_time()
+    now = datetime.now()
     info = [
         'Status: Online',
         'Python version: {}'.format(platform.python_version()),
         'Hikari version: {}'.format(hikari.__version__),
-        'Uptime: ' + str(datetime.now() - startupTime),
+        'Bot uptime: ' + str(now - startupTime),
+        'Host uptime: ' + str(now - datetime.fromtimestamp(bootTime)),
         'Host: {}@{}'.format(host[0], host[1]),
         'Battery: {}% {}'.format('0' if batt is None else round(batt.percent, 2), '(no battery)' if batt is None else '(plugged in)' if batt.power_plugged else '(on battery)'),
         'CPU Temperature: {} ({})'.format(psutil.sensors_temperatures()['coretemp'][0].current, ', '.join([str(t.current) for t in psutil.sensors_temperatures()['coretemp'][1:]])),

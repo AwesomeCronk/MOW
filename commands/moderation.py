@@ -737,7 +737,27 @@ async def command_embed_verify(event, *rawArgs):
     await channel.send('Embed Verified {}'.format(args.user))
     await modLog(guild, '{}: {} embed verified {}'.format(timestamp, sender, args.user))
     return True
-        
+
+
+async def command_clear(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+    guild = event.get_guild()
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='clear', description = descriptions.clear)
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
+        return False
+
+    response = ''
+    referencedMessage = event.message.referenced_message
+    # print('content:', referencedMessage.content)
+    
+   
 
 async def command_clear_alike(event, *rawArgs):
     sender = event.author
