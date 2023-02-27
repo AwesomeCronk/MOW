@@ -13,6 +13,8 @@ commands = {
     'warnings': command_warnings,
     'kick': command_kick,
     'ban': command_ban,
+    'mute': command_mute,
+    'unmute': command_unmute,
     'shush': command_shush,
     'language': command_language,
     'embed-verify': command_embed_verify,

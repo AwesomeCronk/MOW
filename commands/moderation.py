@@ -381,6 +381,120 @@ async def command_ban(event, *rawArgs):
     return True
 
 
+async def command_mute(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+    guild = event.get_guild()
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='mute', description=descriptions.mute)
+            parser.add_argument(
+                'user',
+                help='User to mute',
+                type=str
+            )
+            parser.add_argument(
+                'time',
+                help='how long to mute the user (1h = 1 hour, 5m = 5 minutes, 30s = 30 seconds)',
+                type=str
+            )
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
+        return False
+        
+    # Command stuff goes here
+    response = ''
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+    if not userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES):
+        await channel.send('You do not have permission to mute users.')
+        await modLog(guild, '{}: {} tried to mute {}.'.format(timestamp, sender.mention, args.user))
+        return False
+
+    from __main__ import bot
+
+    id = getIDFromUserMention(args.user)
+    member = guild.get_member(id)
+    if member is None: member = await bot.rest.fetch_member(guild, id)
+    if member is None:
+        await channel.send('Could not mute {} due to API error'.format(args.user))
+        return False
+
+    # Parse mute time
+    timeOk = True
+    for char in args.time:
+        if not char in '0123456789hms':
+            timeOk = False
+    if len(args.time) <= 1: timeOk = False
+    try: timeNumber = int(args.time[0:-1])
+    except ValueError: timeOk = False
+    timeType = args.time[-1]
+    if not timeType in 'hms': timeOk = False
+
+    if not timeOk:
+        await channel.send('Invalid time value: `{}`'.format(args.time))
+        return False
+
+    timeTypeExpanded = {'h': 'hours', 'm': 'minutes', 's': 'seconds'}[timeType]
+    delta = timedelta(**{timeTypeExpanded: timeNumber}); print(delta)
+    mutedUntil = datetime.now(timezone.utc) + delta; print(mutedUntil)
+    await member.edit(communication_disabled_until=mutedUntil)
+    response += 'muted {} for {} {}'.format(args.user, timeNumber, timeTypeExpanded)
+    await modLog(guild, '{}: {} muted {} for {} {}'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
+    await publishInfraction(guild, '{}: {} muted {} for {} {}'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
+
+    await channel.send(response)
+    return True
+
+
+async def command_unmute(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+    guild = event.get_guild()
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='mute', description=descriptions.mute)
+            parser.add_argument(
+                'user',
+                help='User to unmute',
+                type=str
+            )
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
+        return False
+        
+    # Command stuff goes here
+    response = ''
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+    if not userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES):
+        await channel.send('You do not have permission to mute users.')
+        await modLog(guild, '{}: {} tried to mute {}.'.format(timestamp, sender.mention, args.user))
+        return False
+
+    from __main__ import bot
+
+    id = getIDFromUserMention(args.user)
+    member = guild.get_member(id)
+    if member is None: member = await bot.rest.fetch_member(guild, id)
+    if member is None:
+        await channel.send('Could not mute {} due to API error'.format(args.user))
+        return False
+
+    await member.edit(communication_disabled_until=None)
+    await modLog(guild, '{}: {} unmuted {}'.format(timestamp, sender.mention, args.user))
+    response += 'Unmuted {}'.format(args.user)
+
+    await channel.send(response)
+    return True
+
+
 async def command_shush(event, *rawArgs):
     sender = event.author
     channel = event.get_channel()
@@ -411,7 +525,7 @@ async def command_shush(event, *rawArgs):
 
     if not userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES):
         await channel.send('You do not have permission to shush users.')
-        await modLog(guild, '{}: {} tried to shush {}.'.format(timestamp, sender.mention, args.user))
+        await modLog(guild, '{}: {} tried to mute {}.'.format(timestamp, sender.mention, args.user))
         return False
 
     from __main__ import bot
@@ -424,32 +538,27 @@ async def command_shush(event, *rawArgs):
         return False
 
     # Parse shush time
-    if args.time == 'none':
-        await member.edit(communication_disabled_until=None)
-        await modLog(guild, '{}: {} unshushed {}'.format(timestamp, sender.mention, args.user))
-        response += 'Unshushed {}'.format(args.user)
-    else:
-        timeOk = True
-        for char in args.time:
-            if not char in '0123456789hms':
-                timeOk = False
-        if len(args.time) <= 1: timeOk = False
-        try: timeNumber = int(args.time[0:-1])
-        except ValueError: timeOk = False
-        timeType = args.time[-1]
-        if not timeType in 'hms': timeOk = False
+    timeOk = True
+    for char in args.time:
+        if not char in '0123456789hms':
+            timeOk = False
+    if len(args.time) <= 1: timeOk = False
+    try: timeNumber = int(args.time[0:-1])
+    except ValueError: timeOk = False
+    timeType = args.time[-1]
+    if not timeType in 'hms': timeOk = False
 
-        if not timeOk:
-            await channel.send('Invalid time value: `{}`'.format(args.time))
-            return False
-    
-        timeTypeExpanded = {'h': 'hours', 'm': 'minutes', 's': 'seconds'}[timeType]
-        delta = timedelta(**{timeTypeExpanded: timeNumber}); print(delta)
-        shushedUntil = datetime.now(timezone.utc) + delta; print(shushedUntil)
-        await member.edit(communication_disabled_until=shushedUntil)
-        response += 'Shushed {} for {} {} {}'.format(args.user, timeNumber, timeTypeExpanded, dbBotData.get('emoteShut').decode())
-        await modLog(guild, '{}: {} shushed {} for {} {}'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
-        await publishInfraction(guild, '{}: {} shushed {} for {} {}'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
+    if not timeOk:
+        await channel.send('Invalid time value: `{}`'.format(args.time))
+        return False
+
+    timeTypeExpanded = {'h': 'hours', 'm': 'minutes', 's': 'seconds'}[timeType]
+    delta = timedelta(**{timeTypeExpanded: timeNumber}); print(delta)
+    shushedUntil = datetime.now(timezone.utc) + delta; print(shushedUntil)
+    await member.edit(communication_disabled_until=shushedUntil)
+    response += 'Shushed {} for {} {} {}'.format(args.user, timeNumber, timeTypeExpanded, dbBotData.get('emoteShut').decode())
+    await modLog(guild, '{}: {} muted {} for {} {}'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
+    await publishInfraction(guild, '{}: {} muted {} for {} {}'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
 
     await channel.send(response)
     return True
