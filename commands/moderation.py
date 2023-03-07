@@ -753,10 +753,27 @@ async def command_clear(event, *rawArgs):
         print('argparse exited')
         return False
 
-    response = ''
-    referencedMessage = event.message.referenced_message
-    # print('content:', referencedMessage.content)
+    from __main__ import bot
+
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+    if not userHasPermission(sender, guild, hikari.permissions.Permissions.MANAGE_MESSAGES):
+        await channel.send('You do not have permission to clear messages')
+        await modLog(guild, '{}: {} tried to clear messages'.format(timestamp, sender.mention))
+        return False
+
+    referenceMessage = event.message.referenced_message
+    if referenceMessage is None:
+        await channel.send('Reply to the first message you want to clear')
+        return False
+    bulkDeleteLimit = datetime.now(timezone.utc) - timedelta(days=14)
+    deleteLimit = max(bulkDeleteLimit, referenceMessage.created_at)
+    messages = await bot.rest.fetch_messages(channel.id).take_while(lambda message: message.created_at >= deleteLimit).limit(500)
     
+    await bot.rest.delete_messages(channel.id, messages)
+    await channel.send('Cleared {} messages'.format(len(messages) - 1))
+    await modLog(guild, '{}: {} cleared {} messages'.format(timestamp, sender.mention, len(messages) - 1))
+    return True
    
 
 async def command_clear_alike(event, *rawArgs):

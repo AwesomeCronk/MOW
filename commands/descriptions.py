@@ -18,6 +18,7 @@ unmute = 'Unmute a user: `{}unmute @user`'.format(commandPrefix)
 shush = 'Shush a user: `{}shush @user time` (see `{}shush --help` for time formatting)'.format(commandPrefix, commandPrefix)
 language = 'Configure the language filter'
 embed_verify = 'Verify or unverify embed permissions in general channels for a user'
+clear = 'Clear all messages up to a replied message'
 clear_alike = 'Clear all messages in all channels with the same content'
 
 speak = 'Say something somewhere (access restricted for safety reasons)'
