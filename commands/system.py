@@ -142,7 +142,7 @@ async def command_help(event, *rawArgs):
 
     await channel.send(
         '\n'.join(['`{}{}` - {}'.format(commandPrefix, command, getattr(descriptions, command.replace('-', '_'))) for command in [
-            'info', 'config', 'help', 'history', 'rules', 'warn', 'warnings', 'kick', 'ban', 'mute', 'unmute', 'shush', 'language', 'embed-verify', 'clear-alike', 'speak'
+            'info', 'config', 'help', 'history', 'rules', 'warn', 'warnings', 'kick', 'ban', 'mute', 'unmute', 'shush', 'language', 'embed-verify', 'clear', 'clear-alike', 'speak'
             ]])
         + '\nFor help on a specific command, run that command with the argument `-h` or `--help`.'
     )

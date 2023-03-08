@@ -22,4 +22,4 @@ clear = 'Clear all messages up to a replied message'
 clear_alike = 'Clear all messages in all channels with the same content'
 
 speak = 'Say something somewhere (access restricted for safety reasons)'
-impostercronk = ''
+qotd_add = 'Add a question to the QOTD list'

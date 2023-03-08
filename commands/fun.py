@@ -74,3 +74,10 @@ async def command_impostercronk(event, *rawArgs):
     if len(unadjusted): await channel.send('Could not adjust nicknames for:\n{}'.format('\n'.join([str(culprit) for culprit in unadjusted])))
 
     return True
+
+
+def command_qotd_add(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+    guild = event.get_guild()
+    
