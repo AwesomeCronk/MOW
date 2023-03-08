@@ -12,6 +12,7 @@ dbRules = dbRoot.node('rules')
 dbWarnings = dbRoot.node('warnings')
 dbBotData = dbRoot.node('botData')
 dbLanguage = dbRoot.node('language')
+dbQOTD = dbRoot.node('qotd')
 
 
 # IO redirector to keep argparse from shutting down the bot
