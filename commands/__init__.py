@@ -22,5 +22,9 @@ commands = {
     'clear-alike': command_clear_alike,
 
     'speak': command_speak,
-    'impostercronk': command_impostercronk
+    'impostercronk': command_impostercronk,
+    'qotd-add': command_qotd_add,
+    'qotd-list': command_qotd_list,
+    'qotd-config': command_qotd_config,
+    'qotd-ask': command_qotd_ask
 }

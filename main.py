@@ -3,13 +3,15 @@ from datetime import datetime
 
 import hikari
 
-from utils import dbBotData, updatePrefixStatus, modLog
-from commands import commands
-import language
-
+# Semi-circular imports to allow run flag to work
 runFlag = True
 startupTime = datetime.now()
 from uptime import StartUptimeTracking
+from qotd import StartAutoQOTD
+
+from utils import dbBotData, updatePrefixStatus, modLog
+from commands import commands
+import language
 
 
 bot = hikari.GatewayBot(

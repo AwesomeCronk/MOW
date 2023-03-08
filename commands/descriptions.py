@@ -1,5 +1,6 @@
 from utils import dbBotData
 
+
 commandPrefix = dbBotData.get('prefix').decode()
 
 
@@ -23,3 +24,6 @@ clear_alike = 'Clear all messages in all channels with the same content'
 
 speak = 'Say something somewhere (access restricted for safety reasons)'
 qotd_add = 'Add a question to the QOTD list'
+qotd_list = 'Show the QOTD list'
+qotd_config = 'Configure QOTD parameters'
+qotd_ask = 'Ask a QOTD immediately'

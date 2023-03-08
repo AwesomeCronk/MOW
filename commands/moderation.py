@@ -1,5 +1,7 @@
-import argparse, hikari
+import argparse
 from datetime import datetime, timedelta, timezone
+
+import hikari
 
 from utils import dbBotData, dbRules, dbWarnings, dbLanguage
 from utils import redirectIO, modLog, publishInfraction, userHasPermission, userMentionedSelf, userMentionFromID, channelMentionFromID, getIDFromUserMention, getIDFromChannelMention

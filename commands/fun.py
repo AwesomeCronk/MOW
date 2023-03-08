@@ -1,7 +1,12 @@
 import argparse
+from datetime import datetime, timezone
 
-from utils import dbBotData, getIDFromChannelMention, redirectIO
+import hikari
+
 import language
+from qotd import askQOTD
+from utils import dbBotData, dbQOTD, getIDFromChannelMention, redirectIO, userHasPermission
+
 
 from . import descriptions
 
@@ -76,8 +81,149 @@ async def command_impostercronk(event, *rawArgs):
     return True
 
 
-def command_qotd_add(event, *rawArgs):
+async def command_qotd_add(event, *rawArgs):
     sender = event.author
     channel = event.get_channel()
     guild = event.get_guild()
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='qotd-add', description=descriptions.qotd_add)
+            parser.add_argument(
+                'question',
+                type=str,
+                help='The question to add'
+            )
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
+        return False
     
+    if not userHasPermission(sender, guild, hikari.Permissions.MANAGE_MESSAGES):
+        await channel.send('You do not have permission to manage QOTD questions')
+        return False
+
+    dbQuestions = dbQOTD.node('questions')
+    nodeID = 0
+    while nodeID in dbQuestions.nodes: nodeID += 1
+    dbQuestions.mkNode(nodeID)
+    dbQuestion = dbQuestions.node(nodeID)
+
+    dbQuestion.mkKey(0, 'question')
+    dbQuestion.mkKey(1, 'lastAsked')
+    dbQuestion.mkKey(2, 'timesAsked')
+    dbQuestion.mkKey(3, 'suggester')
+
+    dbQuestion.set('question', args.question.encode())
+    dbQuestion.set('lastAsked', b'\x00')
+    dbQuestion.set('timesAsked', b'\x00')
+    dbQuestion.set('suggester', b'')    # Placeholder
+
+    await channel.send('Added question to QOTD list')
+    return True
+
+async def command_qotd_list(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+    guild = event.get_guild()
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='qotd-list', description=descriptions.qotd_list)
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
+        return False
+    
+    if not userHasPermission(sender, guild, hikari.Permissions.MANAGE_MESSAGES):
+        await channel.send('You do not have permission to manage QOTD questions')
+        return False
+    
+    dbQuestions = dbQOTD.node('questions')
+    response = '{} Questions, Current: {}, Minimum age: {}'.format(
+        len(dbQuestions.nodes),
+        int.from_bytes(dbQOTD.get('current'), 'big'),
+        int.from_bytes(dbQOTD.get('minAge'), 'big')
+    )
+    
+    for nodeID in dbQuestions.nodes:
+        dbQuestion = dbQuestions.node(nodeID)
+        response += '\n{}. `{}`\n  Last asked: #{}, Asked {} times, Suggested by {}'.format(
+            nodeID,
+            dbQuestion.get('question').decode(),
+            int.from_bytes(dbQuestion.get('lastAsked'), 'big'),
+            int.from_bytes(dbQuestion.get('timesAsked'), 'big'),
+            dbQuestion.get('suggester').decode()
+        )
+
+    await channel.send(response)
+    return True
+
+async def command_qotd_config(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+    guild = event.get_guild()
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='qotd-config', description=descriptions.qotd_config)
+            parser.add_argument(
+                '-c',
+                '--current',
+                type=int,
+                default=-1,
+                help='Sets the current QOTD (for today, not tomorrow)'
+            )
+            parser.add_argument(
+                '-a',
+                '--age',
+                type=int,
+                default=-1,
+                help='Sets the minimum age to re-ask questions'
+            )
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
+        return False
+    
+    if not userHasPermission(sender, guild, hikari.Permissions.MANAGE_MESSAGES):
+        await channel.send('You do not have permission to manage QOTD questions')
+        return False
+    
+    response = ''
+
+    if args.current != -1:
+        dbQOTD.set('current', int.to_bytes(args.current, 4, 'big'))
+        response += 'Set current QOTD to {}'.format(args.current)
+
+    if args.age != -1:
+        dbQOTD.set('minAge', int.to_bytes(args.age, 4, 'big'))
+        response += '\nSet minimum age to re-ask questions to {}'.format(args.age)
+
+    await channel.send(response)
+    return True
+
+async def command_qotd_ask(event, *rawArgs):
+    sender = event.author
+    channel = event.get_channel()
+    guild = event.get_guild()
+
+    try:
+        with redirectIO() as (argparseOut, argparseErr):
+            parser = argparse.ArgumentParser(prog='qotd-ask', description=descriptions.qotd_ask)
+            args = parser.parse_args(rawArgs)
+    except BaseException as e:
+        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
+        print('argparse exited')
+        return False
+    
+    if not userHasPermission(sender, guild, hikari.Permissions.MANAGE_MESSAGES):
+        await channel.send('You do not have permission to manage QOTD questions')
+        return False
+
+    success = askQOTD()
+    dbQOTD.set('timestamp', int.to_bytes(int(datetime.now(timezone.utc).timestamp()), 8, 'big'))
+    return success
