@@ -733,7 +733,7 @@ async def command_clear(event, *rawArgs):
 
     if not userHasPermission(sender, guild, hikari.permissions.Permissions.MANAGE_MESSAGES):
         await channel.send('You do not have permission to clear messages')
-        await modLog(guild, '{}: {} tried to clear messages'.format(timestamp, sender.mention))
+        await modLog(guild, '{}: {} tried to clear messages in {}'.format(timestamp, sender.mention, channel.mention))
         return False
 
     referenceMessage = event.message.referenced_message
@@ -746,7 +746,7 @@ async def command_clear(event, *rawArgs):
     
     await bot.rest.delete_messages(channel.id, messages)
     await channel.send('Cleared {} messages'.format(len(messages) - 1))
-    await modLog(guild, '{}: {} cleared {} messages'.format(timestamp, sender.mention, len(messages) - 1))
+    await modLog(guild, '{}: {} cleared {} messages in {}'.format(timestamp, sender.mention, len(messages) - 1, channel.mention))
     return True
    
 async def command_clear_alike(event, *rawArgs):
