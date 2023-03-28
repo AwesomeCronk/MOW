@@ -19,8 +19,7 @@ async def command_info(event, *rawArgs):
     #         parser = argparse.ArgumentParser(prog='info', description=descriptions.info)
     #         args = parser.parse_args(rawArgs)
     # except BaseException as e:
-    #     await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-    #     print('argparse exited')
+    #     await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
     #     return False
 
     from __main__ import startupTime
@@ -76,8 +75,7 @@ async def command_config(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
 
     if not userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_GUILD):
@@ -136,8 +134,7 @@ async def command_help(event, *rawArgs):
     #         parser = argparse.ArgumentParser(prog='help', description=descriptions.help)
     #         args = parser.parse_args(rawArgs)
     # except BaseException as e:
-    #     await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-    #     print('argparse exited')
+    #     await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
     #     return False
 
     await channel.send(
@@ -167,8 +164,7 @@ async def command_history(event, *rawArgs):
     #         parser = argparse.ArgumentParser(prog='history', description=descriptions.history)
     #         args = parser.parse_args(rawArgs)
     # except BaseException as e:
-    #     await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-    #     print('argparse exited')
+    #     await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
     #     return False
 
     if not userHasPermission(sender, guild, hikari.permissions.Permissions.MANAGE_MESSAGES):

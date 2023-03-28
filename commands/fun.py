@@ -33,8 +33,7 @@ async def command_speak(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
 
     if not sender.id in [int(id) for id in dbBotData.get('allowedToSpeak').decode().split(' ')]:
@@ -96,8 +95,7 @@ async def command_qotd_add(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
     
     if not userHasPermission(sender, guild, hikari.Permissions.MANAGE_MESSAGES):
@@ -133,8 +131,7 @@ async def command_qotd_list(event, *rawArgs):
             parser = argparse.ArgumentParser(prog='qotd-list', description=descriptions.qotd_list)
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
     
     if not userHasPermission(sender, guild, hikari.Permissions.MANAGE_MESSAGES):
@@ -185,8 +182,7 @@ async def command_qotd_config(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
     
     if not userHasPermission(sender, guild, hikari.Permissions.MANAGE_MESSAGES):
@@ -216,8 +212,7 @@ async def command_qotd_ask(event, *rawArgs):
             parser = argparse.ArgumentParser(prog='qotd-ask', description=descriptions.qotd_ask)
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
     
     if not userHasPermission(sender, guild, hikari.Permissions.MANAGE_MESSAGES):

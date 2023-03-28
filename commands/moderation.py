@@ -41,8 +41,7 @@ async def command_rules(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return
         
     # Command stuff goes here
@@ -120,8 +119,7 @@ async def command_warn(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
         
     # Command stuff goes here
@@ -219,7 +217,6 @@ async def command_warn(event, *rawArgs):
     await channel.send(response)
     return True
 
-
 async def command_warnings(event, *rawArgs):
     sender = event.author
     channel = event.get_channel()
@@ -240,11 +237,9 @@ async def command_warnings(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
 
-    response = ''
     userID = getIDFromUserMention(args.user)
 
     warnings = []
@@ -257,19 +252,20 @@ async def command_warnings(event, *rawArgs):
     hasPermission = userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES)
 
     if not (userMentionedSelf(sender, args.user) or hasPermission):
-        response += 'You do not have permission view someone else\'s warnings.'
-        await channel.send(response)
+        await channel.send('You do not have permission view someone else\'s warnings.')
+        await modLog('{} tried to view warnings for {}'.format(sender.mention))
         return False
 
     response = 'Warnings for {}:\n'.format(args.user)
     if len(warnings):
-        response += '\n'.join(['{}. {} - {}'.format(i + 1, warnings[i][0], warnings[i][1] if warnings[i][1] != 'None' else '') for i in range(len(warnings))])
-    else: response += 'No warnings listed.'
+        response = '\n'.join(['{}. {} - {}'.format(i + 1, warnings[i][0], warnings[i][1] if warnings[i][1] != 'None' else '') for i in range(len(warnings))])
+    else: response = 'No warnings listed.'
 
     if args.direct_messages:
         await sender.send(response)
         await channel.send('Warning list sent to your DMs.')
-    else: await channel.send(response)
+    else:
+        await channel.send(response)
     return True
 
 
@@ -289,16 +285,12 @@ async def command_kick(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
-        
-    response = ''
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
     
     if not userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.KICK_MEMBERS):
-        response += 'You do not have permission to kick users.'
-        await modLog(guild, '{}: {} tried to kick {}.'.format(timestamp, sender.mention, args.user))
+        await channel.send('You do not have permission to kick users.')
+        await modLog(guild, '{} tried to kick {}.'.format(sender.mention, args.user))
         return False
 
     from __main__ import bot
@@ -313,18 +305,15 @@ async def command_kick(event, *rawArgs):
     ownUser = await bot.rest.fetch_my_user()
 
     if id == ownUser.id:
-        response += 'No.'
+        await channel.send('No.')
         return False
 
     await guild.kick(member.user)
 
-    response += 'kicked {}'.format(args.user)
-    await modLog(guild, '{}: {} kicked {}.'.format(timestamp, sender.mention, args.user))
-    await publishInfraction(guild, '{}: {} kicked {}.'.format(timestamp, sender.mention, args.user))
-    
-    await channel.send(response)
+    await channel.send('kicked {}'.format(args.user))
+    await modLog(guild, '{} kicked {}.'.format(sender.mention, args.user))
+    await publishInfraction(guild, '{} kicked {}.'.format(sender.mention, args.user))
     return True
-
 
 async def command_ban(event, *rawArgs):
     sender = event.author
@@ -349,8 +338,7 @@ async def command_ban(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return
 
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -403,12 +391,10 @@ async def command_mute(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
         
     # Command stuff goes here
-    response = ''
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
 
     if not userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES):
@@ -444,13 +430,10 @@ async def command_mute(event, *rawArgs):
     delta = timedelta(**{timeTypeExpanded: timeNumber}); print(delta)
     mutedUntil = datetime.now(timezone.utc) + delta; print(mutedUntil)
     await member.edit(communication_disabled_until=mutedUntil)
-    response += 'muted {} for {} {}'.format(args.user, timeNumber, timeTypeExpanded)
+    await channel.send('muted {} for {} {}'.format(args.user, timeNumber, timeTypeExpanded))
     await modLog(guild, '{}: {} muted {} for {} {}'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
     await publishInfraction(guild, '{}: {} muted {} for {} {}'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
-
-    await channel.send(response)
     return True
-
 
 async def command_unmute(event, *rawArgs):
     sender = event.author
@@ -467,12 +450,10 @@ async def command_unmute(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
         
     # Command stuff goes here
-    response = ''
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
 
     if not userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES):
@@ -491,11 +472,8 @@ async def command_unmute(event, *rawArgs):
 
     await member.edit(communication_disabled_until=None)
     await modLog(guild, '{}: {} unmuted {}'.format(timestamp, sender.mention, args.user))
-    response += 'Unmuted {}'.format(args.user)
-
-    await channel.send(response)
+    await channel.send('Unmuted {}'.format(args.user))
     return True
-
 
 async def command_shush(event, *rawArgs):
     sender = event.author
@@ -517,12 +495,10 @@ async def command_shush(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
         
     # Command stuff goes here
-    response = ''
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
 
     if not userHasPermission(sender, event.get_guild(), hikari.permissions.Permissions.MANAGE_MESSAGES):
@@ -558,11 +534,10 @@ async def command_shush(event, *rawArgs):
     delta = timedelta(**{timeTypeExpanded: timeNumber}); print(delta)
     shushedUntil = datetime.now(timezone.utc) + delta; print(shushedUntil)
     await member.edit(communication_disabled_until=shushedUntil)
-    response += 'Shushed {} for {} {} {}'.format(args.user, timeNumber, timeTypeExpanded, dbBotData.get('emoteShut').decode())
+
+    await channel.send('Shushed {} for {} {} {}'.format(args.user, timeNumber, timeTypeExpanded, dbBotData.get('emoteShut').decode()))
     await modLog(guild, '{}: {} muted {} for {} {}'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
     await publishInfraction(guild, '{}: {} muted {} for {} {}'.format(timestamp, sender.mention, args.user, timeNumber, timeTypeExpanded))
-
-    await channel.send(response)
     return True
 
 
@@ -609,8 +584,7 @@ async def command_language(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
 
     response = ''
@@ -711,8 +685,7 @@ async def command_embed_verify(event, *rawArgs):
             )
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return
         
     from __main__ import bot
@@ -751,8 +724,7 @@ async def command_clear(event, *rawArgs):
             parser = argparse.ArgumentParser(prog='clear', description = descriptions.clear)
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
 
     from __main__ import bot
@@ -777,7 +749,6 @@ async def command_clear(event, *rawArgs):
     await modLog(guild, '{}: {} cleared {} messages'.format(timestamp, sender.mention, len(messages) - 1))
     return True
    
-
 async def command_clear_alike(event, *rawArgs):
     sender = event.author
     channel = event.get_channel()
@@ -788,8 +759,7 @@ async def command_clear_alike(event, *rawArgs):
             parser = argparse.ArgumentParser(prog='clear-alike', description = descriptions.clear_alike)
             args = parser.parse_args(rawArgs)
     except BaseException as e:
-        await channel.send('```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
-        print('argparse exited')
+        await channel.send('Problem while parsing arguments:\n```\n' + argparseOut.getvalue() + argparseErr.getvalue() + '\n```')
         return False
 
     response = ''
