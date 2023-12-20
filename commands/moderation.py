@@ -166,19 +166,30 @@ async def command_warn(event, *rawArgs):
         warnings.append((dbWarning.get('timestamp').decode(), dbWarning.get('note').decode()))
 
     if args.repeal:
-        # Remove last node from database
-        note = dbWarningsUser.node(args.repeal[0] - 1).get('note').decode()
-        del(warnings[args.repeal[0] - 1])   # Remove that item from the list
-        dbWarningsUser.rmNode(len(dbWarningsUser.nodes) - 1)  # Remove the last key (warnings will be rewritten in the proper order)
-        
-        # Response and logging
-        response += 'Repealed warning {} for {}'.format(args.repeal[0], args.user)
-        await modLog(guild, '{}: {} repealed warning {} for {}. (Note: {})'.format(timestamp, sender.mention, args.repeal[0], args.user, note))
-        
-        # Roles
-        warningRoleID = int(dbBotData.get('warningRole{}'.format(len(warnings) + 1)))
-        if not member is None:
-            await member.remove_role(warningRoleID)
+        if len(dbWarningsUser.nodes) >= args.repeal[0]:
+            # Remove last node from database
+            note = dbWarningsUser.node(args.repeal[0] - 1).get('note').decode()
+            del(warnings[args.repeal[0] - 1])   # Remove that item from the list
+            dbWarningsUser.rmNode(len(dbWarningsUser.nodes) - 1)  # Remove the last key (warnings will be rewritten in the proper order)
+            
+            # Response and logging
+            response += 'Repealed warning {} for {}'.format(args.repeal[0], args.user)
+            await modLog(guild, '{}: {} repealed warning {} for {}. (Note: {})'.format(timestamp, sender.mention, args.repeal[0], args.user, note))
+            
+            # Roles
+            try:    warningRoleID = int(dbBotData.get('warningRole{}'.format(len(warnings) + 1)))
+            except: pass    # There is no warning role to remove for this level, skip it silently
+            else:
+                if not member is None:
+                    await member.remove_role(warningRoleID)
+
+        elif len(dbWarningsUser.nodes) > 0:
+            await channel.send('{} only has {} warning{}'.format(args.user, len(dbWarningsUser.nodes), 's' if len(dbWarningsUser.nodes) > 1 else ''))
+            return False
+
+        else:
+            await channel.send('{} has no warnings to repeal'.format(args.user))
+            return False
 
     else:
         # Build new node in database
@@ -193,26 +204,31 @@ async def command_warn(event, *rawArgs):
         await modLog(guild, '{}: {} warned {}. (Note: {})'.format(timestamp, sender.mention, args.user, args.note[0]))
         await publishInfraction(guild, '{}: {} warned {}. (Note: {})\nTotal: {} warnings'.format(timestamp, sender.mention, args.user, args.note[0], len(warnings)))
 
+        if not member is None:
+            # Set warning roles
+            if 0 < len(warnings) <= 3:
+                try: warningRoleID = int(dbBotData.get('warningRole{}'.format(len(warnings))))
+                except: pass    # There is no warning role to remove for this level, skip it silently
+                else: await member.add_role(warningRoleID)
+
+            # Auto-kick
+            if dbBotData.get('autoKickEnabled') == b'yes' and len(warnings) == 3:
+                await guild.kick(member.user)
+                response += '\n{} was kicked automatically.'.format(args.user)
+                await modLog(guild, '{} was kicked automatically.'.format(args.user))
+
+            # Auto-ban
+            if dbBotData.get('autoBanEnabled') == b'yes' and len(warnings) == 4:
+                await guild.ban(member.user, reason='Out of warnings')
+                response += '\n{} was banned automatically.'.format(args.user)
+                await modLog(guild, '{} was banned automatically.'.format(args.user))
+
     # Record warnings in database
     for i, warning in enumerate(warnings):
         timestamp, note = warning
         dbWarning = dbWarningsUser.node(i)
         dbWarning.set('timestamp', timestamp.encode())
         dbWarning.set('note', note.encode())
-
-    if not member is None:
-        # Set warning roles
-        if 0 < len(warnings) <= 3:
-            warningRoleID = int(dbBotData.get('warningRole{}'.format(len(warnings))))
-            await member.add_role(warningRoleID)
-
-        # Auto-kick / auto-ban
-        if dbBotData.get('autoKickEnabled') == b'yes' and len(warnings) == 3:
-            await guild.kick(member.user)
-            response += '\n{} was kicked automatically.'.format(args.user)
-        if dbBotData.get('autoBanEnabled') == b'yes' and len(warnings) == 4:
-            await guild.ban(member.user, reason='Out of warnings')
-            response += '\n{} was banned automatically.'.format(args.user)
 
     await channel.send(response)
     return True
@@ -734,6 +750,10 @@ async def command_clear(event, *rawArgs):
     if not userHasPermission(sender, guild, hikari.permissions.Permissions.MANAGE_MESSAGES):
         await channel.send('You do not have permission to clear messages')
         await modLog(guild, '{}: {} tried to clear messages in {}'.format(timestamp, sender.mention, channel.mention))
+        return False
+
+    if channel.id == int(dbBotData.get('modLogsChannel').decode()):
+        await channel.send('You may not clear messages in the modlogs channel')
         return False
 
     referenceMessage = event.message.referenced_message

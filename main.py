@@ -91,6 +91,7 @@ async def handleMessages(event):
         with open('history.txt', 'a') as historyFile:
             historyFile.write(record)
 
+StartAutoQOTD()
 StartUptimeTracking()
 
 try:

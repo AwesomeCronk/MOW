@@ -219,6 +219,6 @@ async def command_qotd_ask(event, *rawArgs):
         await channel.send('You do not have permission to manage QOTD questions')
         return False
 
-    success = askQOTD()
+    success = await askQOTD()
     dbQOTD.set('timestamp', int.to_bytes(int(datetime.now(timezone.utc).timestamp()), 8, 'big'))
     return success
